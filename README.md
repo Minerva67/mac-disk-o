@@ -1,4 +1,4 @@
-# 🦖 mac-disk-cleanup · 边清理边玩的 Mac 磁盘清理 Skill
+# 🦖 mac-disk-o · 边清理边玩的 Mac 磁盘清理 Skill
 
 > 「我的 Mac 只剩 4.5G 了。」
 > 「系统数据 281G。」
@@ -78,7 +78,7 @@
 ## 🚀 安装
 
 ```bash
-git clone https://github.com/Minerva67/mac-disk-cleanup.git ~/.claude/skills/mac-disk-cleanup
+git clone https://github.com/Minerva67/mac-disk-o.git ~/.claude/skills/mac-disk-cleanup
 ```
 
 然后在 Claude Code 里说一句：
