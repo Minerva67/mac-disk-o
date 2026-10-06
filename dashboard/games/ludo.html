@@ -1,0 +1,522 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>飞行棋</title>
+<style>
+:root{
+  --paper:#FBF8F1;--ink:#151716;--yellow:#FAE36B;--orange:#EF6A2F;--stone:#E3DFD5;--mute:#6B6A66;--white:#fff;
+  --green:#9BC5A3;--blue:#9FB7E0;--card:#FFFFFF;
+  --font:'Outfit','DM Sans',-apple-system,'PingFang SC',sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root{--paper:#151716;--ink:#FBF8F1;--stone:#3A3D3B;--mute:#A3A29C;--card:#1F2221;}
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--paper);color:var(--ink);font-family:var(--font);overflow:hidden;-webkit-tap-highlight-color:transparent}
+#app{display:flex;align-items:center;justify-content:center;gap:12px;height:100vh;padding:8px}
+#board{display:block;flex:none;touch-action:manipulation;user-select:none;-webkit-user-select:none;border-radius:18px}
+#panel{display:flex;flex-direction:column;gap:8px;width:190px;flex:none}
+#head{font-weight:700;font-size:16px;letter-spacing:.5px}
+#head small{font-weight:500;color:var(--mute);font-size:12px;margin-left:4px}
+#turn{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:600;min-height:20px}
+#dot{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink);flex:none}
+#turntxt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#die{width:64px;height:64px;border-radius:14px;border:1.5px solid #151716;background:var(--yellow);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:9px;gap:2px;cursor:pointer;align-self:center;flex:none;box-shadow:0 3px 0 rgba(21,23,22,.25)}
+#die i{display:block;border-radius:50%;background:transparent;margin:auto;width:78%;height:78%}
+#die i.on{background:#151716}
+#die.rolling{animation:shake .24s infinite}
+@keyframes shake{0%{transform:rotate(-12deg) translateY(0)}50%{transform:rotate(12deg) translateY(-4px)}100%{transform:rotate(-12deg) translateY(0)}}
+#btns{display:flex;flex-direction:column;gap:5px}
+#btns .row{display:flex;gap:5px}
+button{font-family:inherit;font-size:13px;font-weight:600;color:var(--ink);cursor:pointer;border:1.5px solid var(--ink);border-radius:999px;background:transparent;padding:6px 12px;line-height:1.2;white-space:nowrap}
+button.primary{background:var(--yellow);color:#151716;font-size:15px;padding:8px 14px}
+button.primary:not(:disabled){animation:pulse 1.3s infinite}
+button:disabled{opacity:.38;cursor:default}
+button.ghost{flex:1;padding:5px 8px;font-size:12px}
+button.icon{padding:5px 0;width:30px;font-size:13px;flex:none}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(239,106,47,.55)}70%{box-shadow:0 0 0 8px rgba(239,106,47,0)}100%{box-shadow:0 0 0 0 rgba(239,106,47,0)}}
+#log{font-size:12px;line-height:1.45;color:var(--mute);min-height:52px}
+#log div{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#log div:last-child{color:var(--ink);font-weight:600}
+#score{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--mute);border-top:1.5px solid var(--stone);padding-top:7px}
+#score div{display:flex;align-items:center;gap:6px}
+#score b{display:inline-block;width:9px;height:9px;border-radius:50%;border:1.2px solid var(--ink)}
+#score span{margin-left:auto}
+@media (max-width:559px){
+  #app{flex-direction:column;justify-content:flex-start;gap:4px;padding:0}
+  #panel{display:grid;grid-template-columns:52px minmax(0,1fr) auto;grid-template-areas:"die turn btns" "die log btns";column-gap:8px;row-gap:1px;width:100%;padding:0 10px;align-items:center}
+  #head,#score{display:none}
+  #die{grid-area:die;width:50px;height:50px;padding:7px;border-radius:12px}
+  #turn{grid-area:turn;font-size:13px;min-height:16px}
+  #log{grid-area:log;font-size:11px;line-height:1.3;min-height:0}
+  #btns{grid-area:btns}
+  button.primary{font-size:14px;padding:6px 12px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="board"></canvas>
+  <div id="panel">
+    <div id="head">✈ 飞行棋<small>小恐龙大作战</small></div>
+    <div id="turn"><span id="dot"></span><span id="turntxt"></span></div>
+    <div id="die" title="点我掷骰子"></div>
+    <div id="btns">
+      <button id="roll" class="primary">掷骰子</button>
+      <div class="row"><button id="restart" class="ghost">重新开始</button><button id="mute" class="icon" title="音效开关">🔊</button></div>
+    </div>
+    <div id="log"></div>
+    <div id="score"></div>
+  </div>
+</div>
+<script>
+(function(){
+'use strict';
+var COLORS=['#EF6A2F','#9BC5A3','#9FB7E0','#FAE36B'];   // slot 0 橙(左上) 1 绿(右上) 2 蓝(右下) 3 黄(左下, 你)
+var NAMES=['小橙','小绿','小蓝','你'];
+var HUMAN=3;
+var TAU=Math.PI*2;
+var cv=document.getElementById('board'), ctx=cv.getContext('2d');
+var S=400, cell=S/15, dpr=1;
+var INK='#151716', CARD='#fff', STONE='#E3DFD5';
+
+/* ---------- 路径：15x15 网格上的 52 格环形赛道（顺时针） ---------- */
+var RING=[];
+(function(){
+  var c,r;
+  RING.push([0,7]);                                   // 0  左臂尖
+  for(c=0;c<=5;c++) RING.push([c,6]);                 // 1-6
+  for(r=5;r>=0;r--) RING.push([6,r]);                 // 7-12
+  RING.push([7,0]);                                   // 13 上臂尖
+  for(r=0;r<=5;r++) RING.push([8,r]);                 // 14-19
+  for(c=9;c<=14;c++) RING.push([c,6]);                // 20-25
+  RING.push([14,7]);                                  // 26 右臂尖
+  for(c=14;c>=9;c--) RING.push([c,8]);                // 27-32
+  for(r=9;r<=14;r++) RING.push([8,r]);                // 33-38
+  RING.push([7,14]);                                  // 39 下臂尖
+  for(r=14;r>=9;r--) RING.push([6,r]);                // 40-45
+  for(c=5;c>=0;c--) RING.push([c,8]);                 // 46-51
+})();
+// 棋子进度 p：-1 基地；0..50 环上（起点 idx=2+13*slot）；51..55 回家通道；56 到家
+var BASE=[[3,3],[12,3],[12,12],[3,12]];
+var SP=[[-1.1,-1.1],[1.1,-1.1],[-1.1,1.1],[1.1,1.1]];
+var DIR=[[-1,0],[0,-1],[1,0],[0,1]];
+var PERP=[[0,1],[1,0],[0,1],[1,0]];
+function ringIdx(slot,p){ return (2+13*slot+p)%52; }
+function cellXY(slot,p,i){
+  if(p<0) return [BASE[slot][0]+SP[i][0], BASE[slot][1]+SP[i][1]];
+  if(p<=50){ var rc=RING[ringIdx(slot,p)]; return [rc[0]+.5, rc[1]+.5]; }
+  if(p<56){
+    var k=p-50;
+    if(slot===0) return [k+.5,7.5];
+    if(slot===1) return [7.5,k+.5];
+    if(slot===2) return [14-k+.5,7.5];
+    return [7.5,14-k+.5];
+  }
+  var d=DIR[slot], q=PERP[slot], o=(i-1.5)*.42;
+  return [7.5+d[0]*.95+q[0]*o, 7.5+d[1]*.95+q[1]*o];
+}
+function slotOfIdx(idx){ return ((idx-2)%4+4)%4; }
+function canJump(p){ return p>0 && p%4===0 && p+4<=50; }
+
+/* ---------- 音效 ---------- */
+var AC=null, muted=false;
+function initAudio(){
+  if(!AC){ try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ AC=null; } }
+  if(AC && AC.state==='suspended'){ try{ AC.resume(); }catch(e){} }
+}
+function tone(f,d,type,v,t0,slide){
+  if(!AC||muted) return;
+  try{
+    var o=AC.createOscillator(), g=AC.createGain(), t=AC.currentTime+(t0||0);
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+    if(slide) o.frequency.exponentialRampToValueAtTime(slide,t+d);
+    g.gain.setValueAtTime(v||.06,t); g.gain.exponentialRampToValueAtTime(.0001,t+d);
+    o.connect(g); g.connect(AC.destination); o.start(t); o.stop(t+d+.03);
+  }catch(e){}
+}
+var sfx={
+  tick:function(){ tone(450+Math.random()*350,.05,'square',.025); },
+  step:function(){ tone(640,.06,'triangle',.05); },
+  takeoff:function(){ tone(300,.28,'sawtooth',.04,0,900); },
+  jump:function(){ tone(420,.3,'triangle',.07,0,1300); },
+  hit:function(){ tone(420,.32,'sawtooth',.06,0,80); },
+  home:function(){ [523,659,784,1047].forEach(function(f,i){ tone(f,.18,'triangle',.07,i*.09); }); },
+  win:function(){ [523,659,784,1047,784,1047,1319].forEach(function(f,i){ tone(f,.2,'triangle',.08,i*.11); }); }
+};
+
+/* ---------- DOM ---------- */
+var elDie=document.getElementById('die'), elRoll=document.getElementById('roll'),
+    elTurn=document.getElementById('turntxt'), elDot=document.getElementById('dot'),
+    elLog=document.getElementById('log'), elScore=document.getElementById('score'),
+    elRestart=document.getElementById('restart'), elMute=document.getElementById('mute');
+var PIPS=[[],[4],[0,8],[0,4,8],[0,2,6,8],[0,2,4,6,8],[0,2,3,5,6,8]];
+var pipEls=[];
+(function(){ for(var i=0;i<9;i++){ var e=document.createElement('i'); elDie.appendChild(e); pipEls.push(e); } })();
+function setDie(v){ for(var i=0;i<9;i++) pipEls[i].className=''; (PIPS[v]||[]).forEach(function(k){ pipEls[k].className='on'; }); }
+
+var logs=[];
+function log(t){ logs.push(t); if(logs.length>3) logs.shift(); renderLog(); }
+function renderLog(){
+  elLog.innerHTML='';
+  logs.forEach(function(t){ var d=document.createElement('div'); d.textContent=t; elLog.appendChild(d); });
+}
+
+/* ---------- 游戏状态 ---------- */
+var G=null, gid=0;
+function sleep(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+
+function newGame(){
+  gid++;
+  var players=[];
+  for(var s=0;s<4;s++){
+    var pcs=[]; for(var i=0;i<4;i++) pcs.push({i:i,p:-1,dr:null});
+    players.push({slot:s,pieces:pcs});
+  }
+  G={players:players,turn:HUMAN,phase:'roll',roll:0,moves:[],over:false,winner:-1};
+  logs=[]; renderLog();
+  elDie.classList.remove('rolling'); setDie(0);
+  log('掷出 6 才能起飞哦～');
+  startTurn();
+}
+
+function startTurn(){
+  var my=gid;
+  if(G.turn===HUMAN){ G.phase='roll'; updateUI(); }
+  else{
+    G.phase='busy'; updateUI();
+    sleep(600).then(function(){ if(my===gid) doRoll(); });
+  }
+}
+
+function updateUI(){
+  var s=G.turn, t;
+  elDot.style.background=COLORS[s];
+  elDie.style.background=COLORS[s];
+  if(G.over) t='🎉 '+(G.winner===HUMAN?'你赢啦!':NAMES[G.winner]+'赢了');
+  else if(s===HUMAN) t = G.phase==='roll'?'轮到你啦，掷骰子!' : G.phase==='pick'?('点一只小恐龙走 '+G.roll+' 步'):'你的回合';
+  else t=NAMES[s]+'的回合…';
+  elTurn.textContent=t;
+  elRoll.disabled=!(s===HUMAN && G.phase==='roll' && !G.over);
+  elScore.innerHTML='';
+  G.players.forEach(function(pl){
+    var n=pl.pieces.filter(function(x){ return x.p>=56; }).length;
+    var d=document.createElement('div');
+    d.innerHTML='<b style="background:'+COLORS[pl.slot]+'"></b>'+NAMES[pl.slot]+'<span>到家 '+n+'/4</span>';
+    elScore.appendChild(d);
+  });
+}
+
+function legalMoves(pl,v){
+  var seen={}, out=[];
+  pl.pieces.forEach(function(pc){
+    if(pc.p>=56) return;
+    var np;
+    if(pc.p<0){ if(v!==6) return; np=0; } else np=Math.min(56,pc.p+v);
+    if(seen[pc.p]) return; seen[pc.p]=1;
+    out.push({pc:pc,np:np});
+  });
+  return out;
+}
+function victimsAt(slot,p){
+  var out=[]; if(p<0||p>50) return out;
+  var idx=ringIdx(slot,p);
+  G.players.forEach(function(o){
+    if(o.slot===slot) return;
+    o.pieces.forEach(function(x){ if(x.p>=0&&x.p<=50&&ringIdx(o.slot,x.p)===idx) out.push({pl:o,pc:x}); });
+  });
+  return out;
+}
+function aiScore(pl,m){
+  var sc=m.pc.p, land=m.np;
+  if(m.pc.p<0) sc+=500;
+  if(land<=50){
+    if(victimsAt(pl.slot,land).length) sc+=1000;
+    if(canJump(land)){ sc+=60; if(victimsAt(pl.slot,land+4).length) sc+=1000; }
+  }
+  if(land===56) sc+=300; else if(land>=51) sc+=80;
+  return sc;
+}
+
+async function doRoll(){
+  var my=gid, s=G.turn, nm=NAMES[s];
+  G.phase='busy'; updateUI(); initAudio();
+  elDie.classList.add('rolling');
+  for(var k=0;k<8;k++){ setDie(1+Math.floor(Math.random()*6)); sfx.tick(); await sleep(70); if(my!==gid) return; }
+  elDie.classList.remove('rolling');
+  var v=1+Math.floor(Math.random()*6);
+  G.roll=v; setDie(v); log(nm+'掷出了 '+v);
+  var pl=G.players[s], moves=legalMoves(pl,v);
+  await sleep(300); if(my!==gid) return;
+  if(!moves.length){
+    log(nm+'没有能走的棋子');
+    await sleep(600); if(my!==gid) return;
+    nextTurn(false); return;
+  }
+  if(s===HUMAN && moves.length>1){ G.moves=moves; G.phase='pick'; updateUI(); return; }
+  await sleep(s===HUMAN?250:450); if(my!==gid) return;
+  var m=moves[0];
+  if(moves.length>1){
+    var best=-1; moves.forEach(function(x){ var sc=aiScore(pl,x)+Math.random(); if(sc>best){ best=sc; m=x; } });
+  }
+  execMove(pl,m);
+}
+
+function tween(pc,pts,ms,hop){
+  return new Promise(function(res){
+    var i=0;
+    pc.dr={x:pts[0][0],y:pts[0][1],lift:0};
+    function run(){
+      if(i>=pts.length-1){ res(); return; }
+      var a=pts[i], b=pts[i+1], t0=performance.now();
+      function f(now){
+        var t=Math.min(1,(now-t0)/ms);
+        pc.dr={x:a[0]+(b[0]-a[0])*t, y:a[1]+(b[1]-a[1])*t, lift:Math.sin(Math.PI*t)*hop*cell};
+        if(t<1) requestAnimationFrame(f); else { i++; sfx.step(); run(); }
+      }
+      requestAnimationFrame(f);
+    }
+    run();
+  });
+}
+
+async function doCaptures(pl,pc){
+  var my=gid, v=victimsAt(pl.slot,pc.p);
+  if(!v.length) return;
+  sfx.hit();
+  v.forEach(function(x){ log(NAMES[pl.slot]+'撞回'+NAMES[x.pl.slot]+'老家!'); });
+  await Promise.all(v.map(function(x){
+    var from=cellXY(x.pl.slot,x.pc.p,x.pc.i), to=cellXY(x.pl.slot,-1,x.pc.i);
+    return tween(x.pc,[from,to],420,1.2).then(function(){ x.pc.p=-1; x.pc.dr=null; });
+  }));
+  if(my!==gid) return;
+}
+
+async function execMove(pl,m){
+  var my=gid, pc=m.pc, s=pl.slot, from=pc.p, nm=NAMES[s], pts=[], q;
+  G.phase='busy'; G.moves=[]; updateUI();
+  if(from<0){ pts=[cellXY(s,-1,pc.i),cellXY(s,0,pc.i)]; sfx.takeoff(); log(nm+'起飞啦!'); }
+  else for(q=from;q<=m.np;q++) pts.push(cellXY(s,q,pc.i));
+  await tween(pc,pts,from<0?340:140,.35);
+  if(my!==gid) return;
+  pc.p=m.np; pc.dr=null;
+  if(pc.p>=0&&pc.p<=50){
+    await doCaptures(pl,pc); if(my!==gid) return;
+    if(canJump(pc.p)){
+      log(nm+'踩到同色格，飞跃 4 格!'); sfx.jump();
+      await tween(pc,[cellXY(s,pc.p,pc.i),cellXY(s,pc.p+4,pc.i)],380,.9);
+      if(my!==gid) return;
+      pc.p+=4; pc.dr=null;
+      await doCaptures(pl,pc); if(my!==gid) return;
+    }
+  }
+  if(pc.p>=56){ log(nm+'有一只小恐龙到家了!'); sfx.home(); }
+  if(pl.pieces.every(function(x){ return x.p>=56; })){
+    G.over=true; G.phase='over'; G.winner=s; sfx.win();
+    log('🎉 '+(s===HUMAN?'你':nm)+'全部到家，获胜!');
+    updateUI(); return;
+  }
+  await sleep(120); if(my!==gid) return;
+  nextTurn(G.roll===6);
+}
+
+function nextTurn(again){
+  if(again) log(NAMES[G.turn]+'掷出 6，再来一次!');
+  else G.turn=(G.turn+1)%4;
+  startTurn();
+}
+
+/* ---------- 输入 ---------- */
+function humanRoll(){
+  initAudio();
+  if(G.over||G.turn!==HUMAN||G.phase!=='roll') return;
+  doRoll();
+}
+elRoll.addEventListener('click',humanRoll);
+elDie.addEventListener('click',humanRoll);
+elRestart.addEventListener('click',function(){ initAudio(); newGame(); });
+elMute.addEventListener('click',function(){ initAudio(); muted=!muted; elMute.textContent=muted?'🔇':'🔊'; });
+document.addEventListener('pointerdown',initAudio,{once:true});
+
+function pieceAtPointer(e){
+  if(!G||G.phase!=='pick'||G.turn!==HUMAN) return null;
+  var r=cv.getBoundingClientRect(), gx=(e.clientX-r.left)/cell, gy=(e.clientY-r.top)/cell;
+  var best=null, bd=.85*.85, pl=G.players[HUMAN];
+  G.moves.forEach(function(m){
+    pl.pieces.forEach(function(pc){
+      if(pc.p!==m.pc.p) return;
+      var xy=cellXY(HUMAN,pc.p,pc.i), d=(xy[0]-gx)*(xy[0]-gx)+(xy[1]-gy)*(xy[1]-gy);
+      if(d<bd){ bd=d; best=m; }
+    });
+  });
+  return best;
+}
+cv.addEventListener('pointerdown',function(e){
+  initAudio();
+  var m=pieceAtPointer(e);
+  if(m){ e.preventDefault(); execMove(G.players[HUMAN],m); }
+});
+cv.addEventListener('pointermove',function(e){
+  if(e.pointerType==='touch') return;
+  cv.style.cursor=pieceAtPointer(e)?'pointer':'default';
+});
+
+/* ---------- 绘制 ---------- */
+function rr(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.arcTo(x+w,y,x+w,y+r,r);
+  ctx.lineTo(x+w,y+h-r); ctx.arcTo(x+w,y+h,x+w-r,y+h,r);
+  ctx.lineTo(x+r,y+h); ctx.arcTo(x,y+h,x,y+h-r,r);
+  ctx.lineTo(x,y+r); ctx.arcTo(x,y,x+r,y,r); ctx.closePath();
+}
+function tintFill(col,alpha){ ctx.fillStyle=CARD; ctx.fill(); ctx.globalAlpha=alpha; ctx.fillStyle=col; ctx.fill(); ctx.globalAlpha=1; }
+
+function drawBoard(){
+  var c=cell, i, s;
+  ctx.clearRect(0,0,S,S);
+  rr(.75,.75,S-1.5,S-1.5,18*S/400); ctx.fillStyle=CARD; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+  // 基地
+  var qx=[0,9,9,0], qy=[0,0,9,9];
+  for(s=0;s<4;s++){
+    rr(qx[s]*c+3,qy[s]*c+3,6*c-6,6*c-6,c*.7);
+    tintFill(COLORS[s],.3);
+    ctx.lineWidth=(G&&G.turn===s&&!G.over)?2.5:1.5; ctx.strokeStyle=(G&&G.turn===s&&!G.over)?INK:STONE; ctx.stroke();
+    for(i=0;i<4;i++){
+      var p=cellXY(s,-1,i);
+      ctx.beginPath(); ctx.arc(p[0]*c,p[1]*c,c*.5,0,TAU); ctx.fillStyle=CARD; ctx.fill();
+      ctx.lineWidth=1; ctx.strokeStyle=STONE; ctx.stroke();
+    }
+  }
+  // 回家通道
+  for(s=0;s<4;s++){
+    for(var p2=51;p2<=55;p2++){
+      var xy=cellXY(s,p2,0);
+      rr((xy[0]-.5)*c+1.5,(xy[1]-.5)*c+1.5,c-3,c-3,c*.2);
+      ctx.fillStyle=COLORS[s]; ctx.globalAlpha=.85; ctx.fill(); ctx.globalAlpha=1;
+      ctx.lineWidth=1; ctx.strokeStyle=INK; ctx.stroke();
+    }
+  }
+  // 环形赛道
+  for(i=0;i<52;i++){
+    var rc=RING[i], cs=slotOfIdx(i), isStart=((i-2)%13===0);
+    rr(rc[0]*c+1.5,rc[1]*c+1.5,c-3,c-3,c*.2);
+    if(isStart){ ctx.fillStyle=COLORS[cs]; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+      ctx.beginPath(); ctx.arc((rc[0]+.5)*c,(rc[1]+.5)*c,c*.14,0,TAU); ctx.fillStyle='#fff'; ctx.fill(); }
+    else { tintFill(COLORS[cs],.55); ctx.lineWidth=1; ctx.strokeStyle=STONE; ctx.stroke(); }
+  }
+  // 中心四色三角
+  var cx=7.5*c, cy=7.5*c, tri=[[[6,6],[6,9]],[[6,6],[9,6]],[[9,6],[9,9]],[[6,9],[9,9]]];
+  for(s=0;s<4;s++){
+    ctx.beginPath(); ctx.moveTo(tri[s][0][0]*c,tri[s][0][1]*c); ctx.lineTo(tri[s][1][0]*c,tri[s][1][1]*c); ctx.lineTo(cx,cy); ctx.closePath();
+    ctx.fillStyle=COLORS[s]; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+  }
+}
+
+function dino(x,y,r,col,lift){
+  var bx=x, by=y-lift;
+  ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(x,y+r*.85,r*Math.max(.4,.85-lift/cell*.4),r*.26,0,0,TAU); ctx.fill();
+  ctx.lineWidth=1.5; ctx.strokeStyle='#151716'; ctx.lineJoin='round'; ctx.fillStyle=col;
+  var k, cxs;
+  for(k=-1;k<=1;k++){
+    cxs=bx+k*r*.5;
+    ctx.beginPath(); ctx.moveTo(cxs-r*.2,by-r*.7); ctx.lineTo(cxs,by-r*(1.2-Math.abs(k)*.1)); ctx.lineTo(cxs+r*.2,by-r*.7); ctx.closePath(); ctx.fill(); ctx.stroke();
+  }
+  ctx.beginPath(); ctx.moveTo(bx-r*.8,by+r*.1); ctx.lineTo(bx-r*1.35,by+r*.55); ctx.lineTo(bx-r*.55,by+r*.65); ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(bx,by,r,0,TAU); ctx.fill(); ctx.stroke();
+  var ex=r*.36, ey=-r*.12, er=r*.27, sx;
+  for(sx=-1;sx<=1;sx+=2){
+    ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(bx+sx*ex,by+ey,er,0,TAU); ctx.fill(); ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#151716'; ctx.beginPath(); ctx.arc(bx+sx*ex+r*.05,by+ey+r*.04,er*.52,0,TAU); ctx.fill();
+  }
+  ctx.lineWidth=1.2; ctx.beginPath(); ctx.arc(bx,by+r*.2,r*.3,.25,Math.PI-.25); ctx.stroke();
+}
+
+function draw(now){
+  requestAnimationFrame(draw);
+  if(!G) return;
+  drawBoard();
+  var pulse=.5+.5*Math.sin(now/180), items=[], pl, pc, c=cell;
+  G.players.forEach(function(pl){
+    pl.pieces.forEach(function(pc){
+      var xy=pc.dr?[pc.dr.x,pc.dr.y]:cellXY(pl.slot,pc.p,pc.i);
+      items.push({slot:pl.slot,pc:pc,x:xy[0],y:xy[1],lift:pc.dr?pc.dr.lift:0,anim:!!pc.dr,r:c*.36});
+    });
+  });
+  // 重叠分组
+  var groups={};
+  items.forEach(function(it){
+    if(it.anim||it.pc.p<0||it.pc.p>=56) return;
+    var key=Math.round(it.x*10)+','+Math.round(it.y*10);
+    (groups[key]=groups[key]||[]).push(it);
+  });
+  Object.keys(groups).forEach(function(k){
+    var g=groups[k], n=g.length; if(n<2) return;
+    g.forEach(function(it,j){
+      it.r=c*.3;
+      if(n===2){ it.x+=(j?.2:-.2); }
+      else { var a=j/n*TAU-Math.PI/2; it.x+=Math.cos(a)*.22; it.y+=Math.sin(a)*.22; }
+    });
+  });
+  items.forEach(function(it){ if(it.pc.p>=56) it.r=c*.27; });
+  // 目标提示 + 可选高亮
+  var movable={};
+  if(G.phase==='pick'&&G.turn===HUMAN){
+    G.moves.forEach(function(m){
+      movable[m.pc.p]=1;
+      var t=cellXY(HUMAN,m.np,m.pc.i);
+      ctx.beginPath(); ctx.arc(t[0]*c,t[1]*c,c*(.3+.04*pulse),0,TAU);
+      ctx.setLineDash([4,3]); ctx.lineWidth=1.8; ctx.strokeStyle=INK; ctx.stroke(); ctx.setLineDash([]);
+    });
+  }
+  items.sort(function(a,b){ return (a.anim-b.anim)||(a.y-b.y); });
+  items.forEach(function(it){
+    if(it.slot===HUMAN&&movable[it.pc.p]&&!it.anim){
+      ctx.beginPath(); ctx.arc(it.x*c,it.y*c-it.r*.1,it.r*(1.45+.15*pulse),0,TAU);
+      ctx.lineWidth=2.2; ctx.strokeStyle=COLORS[3]; ctx.stroke();
+      ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+    }
+    dino(it.x*c,it.y*c,it.r,COLORS[it.slot],it.lift);
+  });
+  if(G.over){
+    var w=c*9, h=c*3.2, x=(S-w)/2, y=(S-h)/2;
+    rr(x,y,w,h,c*.8); ctx.fillStyle=CARD; ctx.fill(); ctx.lineWidth=1.5; ctx.strokeStyle=INK; ctx.stroke();
+    ctx.fillStyle=INK; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.font='700 '+Math.round(c*1.3)+'px Outfit,"DM Sans",-apple-system,"PingFang SC",sans-serif';
+    ctx.fillText(G.winner===HUMAN?'🎉 你赢啦!':'🎉 '+NAMES[G.winner]+'赢了',S/2,y+h*.4);
+    ctx.fillStyle=getComputedStyle(document.documentElement).getPropertyValue('--mute').trim();
+    ctx.font='500 '+Math.round(c*.6)+'px Outfit,"DM Sans",-apple-system,"PingFang SC",sans-serif';
+    ctx.fillText(G.winner===HUMAN?'小恐龙们全部到家':'再来一局，下次一定赢',S/2,y+h*.75);
+  }
+}
+
+/* ---------- 布局 / 主题 ---------- */
+function readTheme(){
+  var cs=getComputedStyle(document.documentElement);
+  INK=cs.getPropertyValue('--ink').trim()||INK;
+  CARD=cs.getPropertyValue('--card').trim()||CARD;
+  STONE=cs.getPropertyValue('--stone').trim()||STONE;
+}
+function layout(){
+  var W=window.innerWidth, H=window.innerHeight, s;
+  if(W<560) s=Math.min(W,H-72,440);
+  else s=Math.min(H-16,400,W-24-190);
+  s=Math.max(180,Math.floor(s));
+  S=s; cell=S/15; dpr=window.devicePixelRatio||1;
+  cv.style.width=S+'px'; cv.style.height=S+'px';
+  cv.width=Math.round(S*dpr); cv.height=Math.round(S*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',layout);
+try{
+  var mq=window.matchMedia('(prefers-color-scheme: dark)');
+  var onMq=function(){ readTheme(); };
+  if(mq.addEventListener) mq.addEventListener('change',onMq); else if(mq.addListener) mq.addListener(onMq);
+}catch(e){}
+
+readTheme(); layout(); newGame(); requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>

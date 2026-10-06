@@ -1,0 +1,588 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>消消乐</title>
+<style>
+:root{
+  --paper:#FBF8F1; --ink:#151716; --yellow:#FAE36B; --orange:#EF6A2F; --stone:#E3DFD5; --mute:#6B6A66; --white:#fff;
+  --card:#fff; --cell-a:#fff; --cell-b:#F4F1E8;
+  --cell:40px;
+  --ease:cubic-bezier(.4,0,.2,1);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --paper:#151716; --ink:#FBF8F1; --card:#1F2321; --cell-a:#1F2321; --cell-b:#262B28; --stone:#33372F; --mute:#A5A398; }
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden}
+body{
+  background:var(--paper);color:var(--ink);
+  font-family:'Outfit','DM Sans',-apple-system,'PingFang SC',sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;
+  user-select:none;-webkit-user-select:none;
+}
+#panel{width:100%;max-width:420px;display:flex;flex-direction:column;gap:6px}
+.head{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.title{font-weight:800;font-size:13.5px;white-space:nowrap;letter-spacing:.2px}
+.btns{display:flex;gap:5px;flex:none}
+.pill{
+  font:inherit;font-size:12px;font-weight:700;color:var(--ink);background:var(--yellow);color:#151716;
+  border:1.5px solid var(--ink);border-radius:999px;padding:3px 10px;cursor:pointer;line-height:1.3;
+  transition:transform .12s var(--ease)
+}
+.pill:active{transform:scale(.93)}
+.pill.ghost{background:transparent;color:var(--ink)}
+.stats{display:flex;gap:6px}
+.stat{
+  flex:1;background:var(--card);border:1.5px solid var(--ink);border-radius:18px;
+  padding:3px 8px;display:flex;align-items:baseline;justify-content:center;gap:5px;white-space:nowrap;min-width:0
+}
+.stat small{font-size:11px;color:var(--mute);font-weight:600}
+.stat b{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums}
+.stat.low b{color:var(--orange)}
+.tip{display:none;font-size:12px;color:var(--mute);line-height:1.6}
+#wrap{
+  position:relative;width:calc(var(--cell)*8);height:calc(var(--cell)*8);flex:none;
+  border-radius:18px;overflow:hidden;box-shadow:0 0 0 1.5px var(--ink);
+  background:conic-gradient(var(--cell-a) 25%,var(--cell-b) 0 50%,var(--cell-a) 0 75%,var(--cell-b) 0);
+  background-size:calc(var(--cell)*2) calc(var(--cell)*2);
+  touch-action:none;
+}
+#board{position:absolute;inset:0;touch-action:none;cursor:pointer}
+.tile{
+  position:absolute;left:0;top:0;width:var(--cell);height:var(--cell);padding:3px;
+  transition:transform .26s var(--ease);will-change:transform;pointer-events:none
+}
+.chip{width:100%;height:100%;transition:transform .15s var(--ease);position:relative}
+.chip svg{width:100%;height:100%;display:block;overflow:visible}
+.chip.all{
+  background:conic-gradient(#FAE36B,#EF6A2F,#9BC5A3,#9FB7E0,#FAE36B);
+  border:1.5px solid #151716;border-radius:50%;animation:glowall 1s ease-in-out infinite alternate
+}
+.sp-row .chip{animation:glow 1s ease-in-out infinite alternate}
+.tile.sel .chip{transform:scale(1.14);filter:drop-shadow(0 2px 0 var(--ink))}
+.tile.hint .chip{animation:hint .7s ease-in-out infinite}
+.intro .chip{animation:intro .4s var(--d) backwards}
+.chip.born{animation:born .4s var(--ease)}
+.chip.pop{animation:pop .28s ease-in forwards !important}
+@keyframes pop{0%{transform:scale(1)}30%{transform:scale(1.28) rotate(-6deg)}100%{transform:scale(0) rotate(40deg);opacity:0}}
+@keyframes intro{from{transform:scale(0);opacity:0}}
+@keyframes born{0%{transform:scale(.2) rotate(-90deg)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes hint{50%{transform:scale(1.12) rotate(4deg)}}
+@keyframes glow{from{filter:drop-shadow(0 0 1px var(--orange))}to{filter:drop-shadow(0 0 6px var(--orange))}}
+@keyframes glowall{from{filter:drop-shadow(0 0 1px #FAE36B)}to{filter:drop-shadow(0 0 7px #EF6A2F)}}
+#wrap.shake{animation:shake .25s}
+@keyframes shake{25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.beam{
+  position:absolute;left:0;width:100%;height:var(--cell);pointer-events:none;z-index:3;
+  background:linear-gradient(90deg,transparent,var(--orange),var(--yellow),var(--orange),transparent);
+  animation:beam .5s ease-out forwards
+}
+@keyframes beam{0%{opacity:0;transform:scaleY(.2)}25%{opacity:.9;transform:scaleY(1)}100%{opacity:0;transform:scaleY(1.2)}}
+.float{
+  position:absolute;width:var(--cell);text-align:center;font-weight:800;font-size:calc(var(--cell)*.38);
+  color:var(--orange);text-shadow:0 1px 0 var(--paper),0 -1px 0 var(--paper),1px 0 0 var(--paper),-1px 0 0 var(--paper);
+  pointer-events:none;z-index:4;animation:floatup .8s ease-out forwards
+}
+@keyframes floatup{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-26px)}}
+#combo{
+  position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:5;pointer-events:none;
+  background:var(--orange);color:#fff;border:1.5px solid #151716;border-radius:999px;
+  font-weight:800;font-size:16px;padding:3px 14px;opacity:0;white-space:nowrap
+}
+#combo.show{animation:combo .9s ease-out}
+@keyframes combo{0%{opacity:0;transform:translateX(-50%) scale(.4)}15%{opacity:1;transform:translateX(-50%) scale(1.25)}30%{transform:translateX(-50%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-8px)}}
+#toast{
+  position:absolute;left:50%;bottom:10px;transform:translateX(-50%);z-index:5;pointer-events:none;
+  background:var(--ink);color:var(--paper);border-radius:999px;font-size:12px;font-weight:600;padding:4px 14px;
+  opacity:0;transition:opacity .25s;white-space:nowrap
+}
+#toast.show{opacity:1}
+#end{
+  position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;
+  background:rgba(21,23,22,.55);padding:12px
+}
+#end.show{display:flex}
+.endcard{
+  background:var(--paper);border:1.5px solid var(--ink);border-radius:18px;padding:14px 16px;text-align:center;
+  width:100%;max-width:290px;animation:in2 .35s var(--ease)
+}
+@keyframes in2{from{transform:scale(.8);opacity:0}}
+.endcard h2{margin:0 0 2px;font-size:20px}
+.endcard .rank{display:inline-block;background:var(--yellow);color:#151716;border:1.5px solid var(--ink);border-radius:999px;padding:1px 12px;font-size:12px;font-weight:800;margin:2px 0 6px}
+.endcard .big{font-size:34px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.endcard p{margin:4px 0;font-size:12px;color:var(--mute);line-height:1.5}
+.endcard .pill{margin-top:6px;font-size:14px;padding:5px 18px}
+/* wide layout */
+body.wide{flex-direction:row;gap:22px}
+body.wide #panel{width:250px;gap:10px}
+body.wide .head{flex-direction:column;align-items:flex-start;gap:10px}
+body.wide .title{font-size:18px;white-space:normal;line-height:1.35}
+body.wide .stats{flex-direction:column;gap:8px}
+body.wide .stat{justify-content:space-between;padding:7px 14px}
+body.wide .stat b{font-size:22px}
+body.wide .tip{display:block}
+body.wide .pill{font-size:13px;padding:5px 14px}
+@media (max-width:400px){ .title{font-size:12.5px} .stat{padding:3px 6px} .stat small{font-size:10px} .stat b{font-size:15px} }
+</style>
+</head>
+<body>
+<div id="panel">
+  <div class="head">
+    <div class="title">消消乐 · 消掉的都是垃圾文件</div>
+    <div class="btns">
+      <button class="pill" id="restart" type="button">重新开始</button>
+      <button class="pill ghost" id="snd" type="button">音效 开</button>
+    </div>
+  </div>
+  <div class="stats">
+    <div class="stat"><small>分数</small><b id="score">0</b></div>
+    <div class="stat" id="movesCard"><small>步数</small><b id="moves">30</b></div>
+    <div class="stat"><small>已清理</small><b id="cleared">0</b></div>
+  </div>
+  <div class="tip">点击或拖动相邻文件交换位置，3 个同类连成一线就能清掉。<br>连 4 个得「行消」，连 5 个得「全清」。<br>仪表盘正在删 5000 万个垃圾 PNG，你也来帮忙消几个吧～</div>
+</div>
+<div id="wrap">
+  <div id="board"></div>
+  <div id="combo"></div>
+  <div id="toast"></div>
+  <div id="end"><div class="endcard">
+    <h2>清理完毕！</h2>
+    <div class="rank" id="rank"></div>
+    <div class="big" id="finalScore">0</div>
+    <p id="finalInfo"></p>
+    <p id="finalBest"></p>
+    <button class="pill" id="again" type="button">再来一局</button>
+  </div></div>
+</div>
+<script>
+(function(){
+'use strict';
+var N=8, MOVES=30, ABORT={abort:1};
+var COLORS=['#FAE36B','#EF6A2F','#9BC5A3','#9FB7E0','#151716','#E3DFD5'];
+var $=function(s){return document.querySelector(s)};
+var board=$('#board'), wrap=$('#wrap'), panel=$('#panel');
+var grid, score, moves, cleared, busy, over, selected, drag, combo, cell=40, epoch=0, idc=0, hintTimer=null;
+var soundOn=true, ac=null;
+
+/* ---------- audio ---------- */
+function initAudio(){
+  if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ac=null; } }
+  if(ac && ac.state==='suspended'){ try{ ac.resume(); }catch(e){} }
+}
+function tone(f,t0,d,type,vol){
+  if(!ac||!soundOn) return;
+  try{
+    var o=ac.createOscillator(), g=ac.createGain(), t=ac.currentTime+t0;
+    o.type=type||'sine'; o.frequency.setValueAtTime(f,t);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol||0.12,t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+d);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+d+0.02);
+  }catch(e){}
+}
+function sfx(name,n){
+  if(!ac||!soundOn) return;
+  if(name==='swap') tone(330,0,.08,'triangle',.08);
+  else if(name==='bad'){ tone(200,0,.12,'sawtooth',.07); tone(150,.1,.14,'sawtooth',.07); }
+  else if(name==='pop'){ var f=523*Math.pow(2,Math.min(n||1,8)*2/12); tone(f,0,.14,'triangle',.13); tone(f*1.5,.05,.12,'sine',.07); }
+  else if(name==='special'){ [523,659,784,1047].forEach(function(f,i){ tone(f,i*.06,.15,'square',.07); }); }
+  else if(name==='end'){ [784,659,523,392].forEach(function(f,i){ tone(f,i*.12,.25,'triangle',.12); }); }
+  else if(name==='shuffle'){ tone(260,0,.1,'sine',.08); tone(390,.08,.1,'sine',.08); }
+}
+
+/* ---------- utils ---------- */
+function sleep(ms){
+  var ep=epoch;
+  return new Promise(function(res,rej){ setTimeout(function(){ ep===epoch?res():rej(ABORT); },ms); });
+}
+function rnd(n){ return Math.floor(Math.random()*n); }
+function key(r,c){ return r*N+c; }
+function inb(r,c){ return r>=0&&r<N&&c>=0&&c<N; }
+function safeGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function safeSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+/* ---------- tile drawing ---------- */
+var PAGE='<path d="M14 8h13l9 9v23a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2z" fill="#fff" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/><path d="M27 8v9h9" fill="none" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/>';
+function label(t){ return '<text x="24" y="34" text-anchor="middle" font-size="10" font-weight="800" font-family="Outfit,sans-serif" fill="#151716">'+t+'</text>'; }
+function glyph(k){
+  switch(k){
+    case 0: return PAGE+'<path d="M16 25l5-5 4 4 3-3 4 4v0" fill="none" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/>'+label('PNG');
+    case 1: return PAGE+'<circle cx="31" cy="22" r="2" fill="#EF6A2F"/><path d="M16 26l4-4 3 3" fill="none" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/>'+label('JPG');
+    case 2: return PAGE+'<path d="M20 19l7 4-7 4z" fill="#9BC5A3" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/>'+label('GIF');
+    case 3: return PAGE+'<path d="M24 9v26" stroke="#151716" stroke-width="3" stroke-dasharray="3 3" fill="none"/><rect x="21" y="29" width="6" height="8" rx="1.5" fill="#9FB7E0" stroke="#151716" stroke-width="1.5"/>';
+    case 4: return '<path d="M9 15a3 3 0 0 1 3-3h8l4 4h12a3 3 0 0 1 3 3v16a3 3 0 0 1-3 3H12a3 3 0 0 1-3-3z" fill="#FBF8F1" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/><path d="M9 20h30" stroke="#151716" stroke-width="1.5"/><circle cx="24" cy="29" r="2.2" fill="#EF6A2F"/>';
+    case 5: return '<path d="M18 13v-3h12v3M13 13h22" fill="none" stroke="#151716" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 16h18l-1.6 21a2.5 2.5 0 0 1-2.5 2.3h-9.8a2.5 2.5 0 0 1-2.5-2.3z" fill="#fff" stroke="#151716" stroke-width="1.5" stroke-linejoin="round"/><path d="M21 21v13M27 21v13" stroke="#151716" stroke-width="1.5" stroke-linecap="round"/>';
+  }
+  return '';
+}
+function chipHTML(t){
+  if(t.special==='all'){
+    return '<svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="14" fill="#fff" stroke="#151716" stroke-width="1.5"/><text x="24" y="29" text-anchor="middle" font-size="13" font-weight="800" font-family="Outfit,PingFang SC,sans-serif" fill="#151716">全清</text></svg>';
+  }
+  var s='<svg viewBox="0 0 48 48"><rect x="1" y="1" width="46" height="46" rx="13" fill="'+COLORS[t.kind]+'" stroke="#151716" stroke-width="1.5"/>'+glyph(t.kind);
+  if(t.special==='row'){
+    s+='<circle cx="38" cy="38" r="9.5" fill="#EF6A2F" stroke="#151716" stroke-width="1.5"/><path d="M32.5 38h11M32.5 38l3-3M32.5 38l3 3M43.5 38l-3-3M43.5 38l-3 3" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  return s+'</svg>';
+}
+function mk(kind){ return {id:++idc,kind:kind,special:null,el:null,r:0,c:0,allKind:null}; }
+function makeEl(t){
+  var d=document.createElement('div');
+  d.className='tile'+(t.special==='row'?' sp-row':'');
+  var ch=document.createElement('div');
+  ch.className='chip'+(t.special==='all'?' all':'');
+  ch.innerHTML=chipHTML(t);
+  d.appendChild(ch); board.appendChild(d); t.el=d; return d;
+}
+function place(t,r,c){ t.r=r; t.c=c; t.el.style.transform='translate('+(c*cell)+'px,'+(r*cell)+'px)'; }
+function chipOf(t){ return t.el.firstChild; }
+function rerender(t){
+  t.el.className='tile'+(t.special==='row'?' sp-row':'');
+  var ch=chipOf(t); ch.className='chip'+(t.special==='all'?' all':''); ch.innerHTML=chipHTML(t);
+}
+
+/* ---------- logic ---------- */
+function findRuns(){
+  var runs=[], r, c, e, t, cells, i;
+  for(r=0;r<N;r++){
+    c=0;
+    while(c<N){
+      t=grid[r][c];
+      if(!t||t.kind<0||t.special==='all'){ c++; continue; }
+      e=c+1;
+      while(e<N&&grid[r][e]&&grid[r][e].special!=='all'&&grid[r][e].kind===t.kind) e++;
+      if(e-c>=3){ cells=[]; for(i=c;i<e;i++) cells.push([r,i]); runs.push({cells:cells,kind:t.kind}); }
+      c=e;
+    }
+  }
+  for(c=0;c<N;c++){
+    r=0;
+    while(r<N){
+      t=grid[r][c];
+      if(!t||t.special==='all'){ r++; continue; }
+      e=r+1;
+      while(e<N&&grid[e][c]&&grid[e][c].special!=='all'&&grid[e][c].kind===t.kind) e++;
+      if(e-r>=3){ cells=[]; for(i=r;i<e;i++) cells.push([i,c]); runs.push({cells:cells,kind:t.kind}); }
+      r=e;
+    }
+  }
+  return runs;
+}
+function findMove(){
+  var r,c,t,d,r2,c2,x,y,ok;
+  for(r=0;r<N;r++) for(c=0;c<N;c++){
+    t=grid[r][c];
+    if(t&&t.special){ return [{r:r,c:c}, c+1<N?{r:r,c:c+1}:{r:r,c:c-1}]; }
+  }
+  var dirs=[[0,1],[1,0]];
+  for(r=0;r<N;r++) for(c=0;c<N;c++) for(d=0;d<2;d++){
+    r2=r+dirs[d][0]; c2=c+dirs[d][1];
+    if(!inb(r2,c2)) continue;
+    x=grid[r][c]; y=grid[r2][c2];
+    grid[r][c]=y; grid[r2][c2]=x;
+    ok=findRuns().length>0;
+    grid[r][c]=x; grid[r2][c2]=y;
+    if(ok) return [{r:r,c:c},{r:r2,c:c2}];
+  }
+  return null;
+}
+function mostCommonKind(){
+  var cnt=[0,0,0,0,0,0], best=0, r, c;
+  for(r=0;r<N;r++) for(c=0;c<N;c++){ var t=grid[r][c]; if(t&&t.kind>=0) cnt[t.kind]++; }
+  for(var k=1;k<6;k++) if(cnt[k]>cnt[best]) best=k;
+  return best;
+}
+
+/* ---------- UI helpers ---------- */
+function upd(){
+  $('#score').textContent=score; $('#moves').textContent=moves; $('#cleared').textContent=cleared;
+  $('#movesCard').classList.toggle('low',moves<=5);
+}
+var toastTimer=null;
+function toast(msg,ms){
+  var el=$('#toast'); el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(function(){ el.classList.remove('show'); },ms||1400);
+}
+function showCombo(n){
+  var el=$('#combo'); el.textContent='连击 x'+n+'!';
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+}
+function floatText(r,c,txt){
+  var d=document.createElement('div'); d.className='float'; d.textContent=txt;
+  d.style.left=(c*cell)+'px'; d.style.top=(r*cell+cell*.25)+'px';
+  board.appendChild(d); setTimeout(function(){ d.remove(); },850);
+}
+function beam(r){
+  var d=document.createElement('div'); d.className='beam'; d.style.top=(r*cell)+'px';
+  board.appendChild(d); setTimeout(function(){ d.remove(); },560);
+}
+function clearHint(){
+  clearTimeout(hintTimer);
+  var els=board.querySelectorAll('.hint'); for(var i=0;i<els.length;i++) els[i].classList.remove('hint');
+}
+function scheduleHint(){
+  clearHint();
+  hintTimer=setTimeout(function(){
+    if(busy||over||!grid) return;
+    var m=findMove(); if(!m) return;
+    m.forEach(function(p){ var t=grid[p.r][p.c]; if(t) t.el.classList.add('hint'); });
+  },7000);
+}
+function deselect(){
+  if(selected){ var t=grid[selected.r][selected.c]; if(t) t.el.classList.remove('sel'); selected=null; }
+}
+function select(r,c){
+  deselect(); var t=grid[r][c]; if(!t) return; selected={r:r,c:c}; t.el.classList.add('sel');
+}
+
+/* ---------- core step ---------- */
+async function step(extra,hint){
+  var runs=findRuns();
+  if(!runs.length&&!(extra&&extra.size)) return false;
+  combo++;
+  var set=new Set(extra?Array.from(extra):[]);
+  var creates=[], seen={};
+  runs.forEach(function(run){
+    run.cells.forEach(function(p){ set.add(key(p[0],p[1])); });
+    if(run.cells.length>=4){
+      var pos=null;
+      if(hint) pos=run.cells.find(function(p){ return hint.some(function(h){ return h.r===p[0]&&h.c===p[1]; }); });
+      if(!pos) pos=run.cells[Math.floor(run.cells.length/2)];
+      var k=key(pos[0],pos[1]);
+      if(!seen[k]){ seen[k]=1; creates.push({r:pos[0],c:pos[1],special:run.cells.length>=5?'all':'row',kind:run.kind,k:k}); }
+    }
+  });
+  var keep=[];
+  creates.forEach(function(cr){
+    var t=grid[cr.r][cr.c];
+    if(t&&!t.special&&!(extra&&extra.has(cr.k))){ keep.push(cr); set.delete(cr.k); }
+  });
+  // chain-expand specials
+  var q=Array.from(set), beams={}, usedSpecial=false;
+  while(q.length){
+    var kk=q.pop(), rr=Math.floor(kk/N), cc=kk%N, t=grid[rr][cc];
+    if(!t) continue;
+    if(t.special==='row'){
+      usedSpecial=true; beams[rr]=1;
+      for(var x=0;x<N;x++){ var k2=key(rr,x); if(grid[rr][x]&&!set.has(k2)){ set.add(k2); q.push(k2); } }
+    }else if(t.special==='all'){
+      usedSpecial=true;
+      var tk=t.allKind; if(tk===null||tk===undefined) tk=mostCommonKind();
+      for(var y=0;y<N;y++) for(var z=0;z<N;z++){
+        var u=grid[y][z], k3=key(y,z);
+        if(u&&!set.has(k3)&&(tk==='every'||(u.kind===tk&&u.special!=='all'))){ set.add(k3); q.push(k3); }
+      }
+    }
+  }
+  keep=keep.filter(function(cr){ return !set.has(cr.k); });
+  var tiles=[];
+  set.forEach(function(k){ var t=grid[Math.floor(k/N)][k%N]; if(t) tiles.push(t); });
+  var n=tiles.length;
+  var pts=n*10*combo+(n>3?(n-3)*5*combo:0)+(usedSpecial?50*combo:0);
+  score+=pts; cleared+=n; upd();
+  Object.keys(beams).forEach(function(r){ beam(+r); });
+  var sr=0, sc=0;
+  tiles.forEach(function(t){ sr+=t.r; sc+=t.c; chipOf(t).classList.add('pop'); grid[t.r][t.c]=null; });
+  floatText(Math.max(0,Math.min(N-1,Math.round(sr/n))),Math.max(0,Math.min(N-1,Math.round(sc/n))),'+'+pts);
+  sfx(usedSpecial?'special':'pop',combo);
+  if(combo>=2) showCombo(combo);
+  await sleep(290);
+  tiles.forEach(function(t){ t.el.remove(); });
+  keep.forEach(function(cr){
+    var t=grid[cr.r][cr.c]; if(!t) return;
+    t.special=cr.special; if(cr.special==='all'){ t.kind=-1; }
+    rerender(t); chipOf(t).classList.add('born');
+  });
+  if(keep.length){
+    sfx('special');
+    toast(keep.some(function(c){return c.special==='all';})?'获得「全清」！和任意文件交换，清掉同类':'获得「行消」！消除它所在的整行',1600);
+  }
+  await gravity();
+  return true;
+}
+async function gravity(){
+  var spawn=[], c, r, w, t, i, n;
+  for(c=0;c<N;c++){
+    w=N-1;
+    for(r=N-1;r>=0;r--){
+      t=grid[r][c];
+      if(t){ if(r!==w){ grid[w][c]=t; grid[r][c]=null; place(t,w,c); } w--; }
+    }
+    n=w+1;
+    for(r=w;r>=0;r--){
+      t=mk(rnd(6)); makeEl(t); t.el.style.transition='none'; place(t,r-n,c); grid[r][c]=t; spawn.push([t,r,c]);
+    }
+  }
+  void board.offsetHeight;
+  spawn.forEach(function(s){ s[0].el.style.transition=''; place(s[0],s[1],s[2]); });
+  await sleep(330);
+}
+async function cascade(extra,hint){
+  combo=0;
+  var more=await step(extra,hint);
+  while(more){ more=await step(null,null); }
+}
+async function reshuffle(){
+  toast('没有可消除的了，洗牌中…',1500); sfx('shuffle');
+  var tiles=[], r, c, tries=0;
+  for(r=0;r<N;r++) for(c=0;c<N;c++) tiles.push(grid[r][c]);
+  do{
+    for(var i=tiles.length-1;i>0;i--){ var j=rnd(i+1), tmp=tiles[i]; tiles[i]=tiles[j]; tiles[j]=tmp; }
+    for(r=0;r<N;r++) for(c=0;c<N;c++) grid[r][c]=tiles[r*N+c];
+    tries++;
+  }while((findRuns().length||!findMove())&&tries<200);
+  for(r=0;r<N;r++) for(c=0;c<N;c++) place(grid[r][c],r,c);
+  await sleep(420);
+  if(findRuns().length) await cascade(null,null);
+}
+function doSwap(a,b){
+  var ta=grid[a.r][a.c], tb=grid[b.r][b.c];
+  grid[a.r][a.c]=tb; grid[b.r][b.c]=ta; place(ta,b.r,b.c); place(tb,a.r,a.c);
+}
+async function trySwap(a,b){
+  if(busy||over) return;
+  busy=true; deselect(); clearHint();
+  try{
+    var ta=grid[a.r][a.c], tb=grid[b.r][b.c];
+    doSwap(a,b); sfx('swap'); await sleep(240);
+    var sp=ta.special||tb.special;
+    if(!sp&&!findRuns().length){
+      doSwap(a,b); sfx('bad'); wrap.classList.remove('shake'); void wrap.offsetWidth; wrap.classList.add('shake');
+      await sleep(250); busy=false; scheduleHint(); return;
+    }
+    moves--; upd();
+    var extra=null;
+    if(sp){
+      extra=new Set();
+      if(ta.special==='all'||tb.special==='all'){
+        var at=ta.special==='all'?ta:tb, ot=at===ta?tb:ta;
+        at.allKind=ot.special==='all'?'every':ot.kind;
+        if(ot.special==='all') ot.allKind='every';
+        extra.add(key(at.r,at.c));
+        if(at.allKind!=='every'){
+          for(var r=0;r<N;r++) for(var c=0;c<N;c++){ var u=grid[r][c]; if(u&&u.kind===at.allKind&&u.special!=='all') extra.add(key(r,c)); }
+        }
+        if(ot.special==='all') extra.add(key(ot.r,ot.c));
+      }
+      [ta,tb].forEach(function(t){ if(t.special==='row') extra.add(key(t.r,t.c)); });
+    }
+    await cascade(extra,[a,b]);
+    if(moves<=0){ await sleep(350); showEnd(); busy=false; return; }
+    if(!findMove()) await reshuffle();
+    if(moves<=0){ showEnd(); }
+    busy=false; scheduleHint();
+  }catch(e){ if(e!==ABORT) throw e; }
+}
+
+/* ---------- game flow ---------- */
+function ratingFor(s){
+  if(s<600) return '实习清道夫';
+  if(s<1500) return '合格清理工';
+  if(s<2800) return '垃圾粉碎机';
+  return 'PNG 终结者';
+}
+function showEnd(){
+  over=true; sfx('end'); clearHint();
+  var best=parseInt(safeGet('match3_best')||'0',10)||0, newBest=score>best;
+  if(newBest){ best=score; safeSet('match3_best',String(best)); }
+  $('#rank').textContent=ratingFor(score);
+  $('#finalScore').textContent=score;
+  $('#finalInfo').textContent='你帮仪表盘清掉了 '+cleared+' 个垃圾文件，还剩 '+(50000000-cleared).toLocaleString('zh-CN')+' 个等着被删～';
+  $('#finalBest').textContent=newBest?'新纪录！':'历史最高 '+best;
+  $('#end').classList.add('show');
+}
+function newGame(){
+  epoch++; clearTimeout(hintTimer);
+  board.innerHTML=''; $('#end').classList.remove('show');
+  score=0; moves=MOVES; cleared=0; busy=false; over=false; selected=null; drag=null; combo=0;
+  var r,c,k,tries=0;
+  do{
+    grid=[];
+    for(r=0;r<N;r++){
+      grid.push([]);
+      for(c=0;c<N;c++){
+        do{ k=rnd(6); }while(
+          (c>=2&&grid[r][c-1].kind===k&&grid[r][c-2].kind===k)||
+          (r>=2&&grid[r-1][c].kind===k&&grid[r-2][c].kind===k));
+        grid[r].push(mk(k));
+      }
+    }
+    tries++;
+  }while(!findMove()&&tries<50);
+  for(r=0;r<N;r++) for(c=0;c<N;c++){
+    var t=grid[r][c]; makeEl(t); place(t,r,c);
+    t.el.classList.add('intro'); t.el.style.setProperty('--d',((r+c)*28)+'ms');
+  }
+  upd();
+  var ep=epoch;
+  setTimeout(function(){ if(ep!==epoch) return; var els=board.querySelectorAll('.intro'); for(var i=0;i<els.length;i++) els[i].classList.remove('intro'); },900);
+  scheduleHint();
+}
+
+/* ---------- input ---------- */
+function posOf(e){
+  var rect=board.getBoundingClientRect();
+  var c=Math.floor((e.clientX-rect.left)/cell), r=Math.floor((e.clientY-rect.top)/cell);
+  return inb(r,c)?{r:r,c:c}:null;
+}
+function adjacent(a,b){ return Math.abs(a.r-b.r)+Math.abs(a.c-b.c)===1; }
+function onClickCell(p){
+  if(!selected){ select(p.r,p.c); return; }
+  if(selected.r===p.r&&selected.c===p.c){ deselect(); return; }
+  if(adjacent(selected,p)){ var s=selected; trySwap(s,p); }
+  else select(p.r,p.c);
+}
+board.addEventListener('pointerdown',function(e){
+  initAudio();
+  if(busy||over) return;
+  var p=posOf(e); if(!p) return;
+  drag={x:e.clientX,y:e.clientY,r:p.r,c:p.c,done:false};
+  try{ board.setPointerCapture(e.pointerId); }catch(err){}
+  e.preventDefault();
+});
+board.addEventListener('pointermove',function(e){
+  if(!drag||drag.done) return;
+  var dx=e.clientX-drag.x, dy=e.clientY-drag.y, th=cell*0.35;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<th) return;
+  var a={r:drag.r,c:drag.c}, b;
+  if(Math.abs(dx)>Math.abs(dy)) b={r:a.r,c:a.c+(dx>0?1:-1)}; else b={r:a.r+(dy>0?1:-1),c:a.c};
+  drag.done=true;
+  if(inb(b.r,b.c)) trySwap(a,b);
+});
+board.addEventListener('pointerup',function(e){
+  if(drag&&!drag.done&&!busy&&!over) onClickCell({r:drag.r,c:drag.c});
+  drag=null;
+});
+board.addEventListener('pointercancel',function(){ drag=null; });
+$('#restart').addEventListener('click',function(){ initAudio(); newGame(); });
+$('#again').addEventListener('click',function(){ initAudio(); newGame(); });
+$('#snd').addEventListener('click',function(){
+  initAudio(); soundOn=!soundOn; this.textContent='音效 '+(soundOn?'开':'关');
+});
+
+/* ---------- layout ---------- */
+function fit(){
+  var w=window.innerWidth, h=window.innerHeight, wide=w>=620, size;
+  document.body.classList.toggle('wide',wide);
+  if(wide) size=Math.min(h-20,w-300);
+  else size=Math.min(w-16,h-panel.offsetHeight-8-16);
+  cell=Math.max(24,Math.floor(size/8));
+  document.documentElement.style.setProperty('--cell',cell+'px');
+  if(grid){
+    for(var r=0;r<N;r++) for(var c=0;c<N;c++){
+      var t=grid[r][c]; if(!t||!t.el) continue;
+      t.el.style.transition='none'; place(t,r,c);
+    }
+    void board.offsetHeight;
+    for(r=0;r<N;r++) for(c=0;c<N;c++){ t=grid[r][c]; if(t&&t.el) t.el.style.transition=''; }
+  }
+}
+window.addEventListener('resize',fit);
+fit();
+newGame();
+fit();
+})();
+</script>
+</body>
+</html>
