@@ -1,0 +1,500 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>数学闯关</title>
+<style>
+:root{--bg:#FBF8F1;--ink:#151716;--yellow:#FAE36B;--orange:#EF6A2F;--stone:#E3DFD5;--mute:#6B6A66;--green:#9BC5A3;--blue:#9FB7E0;--pink:#F2B5C4;--card:#FFFFFF}
+@media (prefers-color-scheme:dark){:root{--bg:#151716;--ink:#FBF8F1;--stone:#34373a;--mute:#A3A29C;--card:#1F2221}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font-family:'Outfit','DM Sans',-apple-system,'PingFang SC',sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;gap:6px;padding:8px 10px;position:relative}
+#top{display:flex;align-items:center;gap:6px;flex:none;font-size:14px}
+.pill{border-radius:999px;padding:2px 10px;font-weight:700;font-size:13px;background:var(--yellow);color:#151716;white-space:nowrap}
+#combo{background:var(--stone);color:var(--ink)}
+#combo.hot{background:var(--orange);color:#fff;animation:pulse .4s}
+@keyframes pulse{50%{transform:scale(1.25)}}
+#lives{font-size:16px;letter-spacing:1px;white-space:nowrap}
+#lives .x{opacity:.2;filter:grayscale(1)}
+.sp{flex:1}
+#score{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums}
+#mute{border:0;background:var(--stone);color:var(--ink);border-radius:999px;width:28px;height:28px;font-size:14px;cursor:pointer;padding:0}
+#bar{height:7px;border-radius:99px;background:var(--stone);flex:none;overflow:hidden}
+#barfill{display:block;height:100%;width:100%;background:var(--green);border-radius:99px;transition:background .3s}
+#barfill.mid{background:var(--yellow)}#barfill.low{background:var(--orange)}
+#main{flex:1;min-height:0;background:var(--card);border:1.5px solid var(--stone);border-radius:18px;padding:8px 12px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:4px;overflow:hidden;cursor:default}
+#qtype{font-size:12px;color:var(--mute);font-weight:600;display:flex;gap:6px;align-items:center}
+.tag{background:var(--green);color:#151716;border-radius:99px;padding:0 7px;font-size:11px}.tag.off{background:var(--stone);color:var(--mute)}
+#q{font-size:clamp(22px,7vw,34px);font-weight:800;line-height:1.25;font-variant-numeric:tabular-nums;word-break:break-word}
+#q.sm{font-size:clamp(17px,5.2vw,23px);line-height:1.4}
+#q b{background:var(--yellow);color:#151716;border-radius:6px;padding:0 4px}
+.chip{display:inline-flex;align-items:center;justify-content:center;min-width:46px;height:46px;border-radius:14px;margin:0 3px;color:#151716;font-size:28px}
+.c0{background:var(--yellow)}.c1{background:var(--green)}.c2{background:var(--blue)}.c3{background:var(--pink)}
+#hint{font-size:12.5px;color:var(--mute);min-height:17px;line-height:1.35}
+#hint.err{color:var(--orange);font-weight:700}
+#fb{display:none;width:100%;font-size:14px;line-height:1.4}
+#fb .t{font-weight:800;font-size:17px}#fb .ok{color:#2f7d4a}#fb .no{color:var(--orange)}
+#fb .e{color:var(--mute);margin-top:2px}#fb .go{font-size:11px;color:var(--mute);opacity:.8;margin-top:2px}
+@media (prefers-color-scheme:dark){#fb .ok{color:var(--green)}}
+.main-fb #q,.main-fb #hint{display:none}.main-fb #fb{display:block}
+#ans{display:flex;gap:6px;flex:none}
+#inp{flex:1;min-width:0;height:38px;border-radius:999px;border:1.5px solid var(--ink);background:var(--card);color:var(--ink);font:700 18px inherit;font-family:inherit;padding:0 14px;outline:none}
+#inp:focus{box-shadow:0 0 0 3px var(--yellow)}
+.btn{border:0;border-radius:999px;font-family:inherit;font-weight:700;cursor:pointer;color:#151716;background:var(--yellow);padding:0 16px;height:38px;font-size:15px}
+.btn.ghost{background:var(--stone);color:var(--ink)}
+.btn:active,.key:active,.ch:active{transform:scale(.95)}
+#keys{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;flex:none}
+.key{border:0;border-radius:12px;background:var(--stone);color:var(--ink);font:700 17px inherit;font-family:inherit;height:32px;cursor:pointer;padding:0}
+.key.op{background:var(--blue);color:#151716}.key.go{grid-column:span 3;background:var(--yellow);color:#151716}.key.off{opacity:.3;pointer-events:none}
+#choices{display:none;grid-template-columns:1fr 1fr;gap:8px;flex:none}
+.ch{border:1.5px solid var(--ink);border-radius:18px;background:var(--card);color:var(--ink);font:800 24px inherit;font-family:inherit;height:54px;cursor:pointer}
+#ov{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:var(--bg);z-index:5;padding:14px}
+#ov.on{display:flex}
+.card{background:var(--card);border:1.5px solid var(--stone);border-radius:18px;padding:18px 16px;text-align:center;max-width:420px;width:100%}
+.card h2{margin:0 0 6px;font-size:26px}.card p{margin:4px 0 12px;font-size:14px;line-height:1.5;color:var(--mute)}
+.card .big{font-size:40px;font-weight:800;line-height:1.1}
+.stats{display:flex;justify-content:center;gap:14px;margin:8px 0 12px;font-size:13px;color:var(--mute);flex-wrap:wrap}.stats b{display:block;color:var(--ink);font-size:20px}
+#toast{position:absolute;left:50%;top:44px;transform:translate(-50%,-10px);background:var(--ink);color:var(--bg);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:700;opacity:0;pointer-events:none;transition:.25s;z-index:9;white-space:nowrap}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.shake{animation:shk .3s}@keyframes shk{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+@media (max-height:420px){.chip{height:38px;min-width:40px;font-size:24px}#inp,.btn{height:34px}.key{height:29px}.ch{height:46px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="top">
+    <span class="pill" id="tier">Lv.1</span>
+    <span id="lives"></span>
+    <span class="sp"></span>
+    <span id="score">0</span>
+    <span class="pill" id="combo">×1</span>
+    <button id="mute" title="静音" aria-label="静音">🔊</button>
+  </div>
+  <div id="bar"><i id="barfill"></i></div>
+  <div id="main">
+    <div id="qtype"></div>
+    <div id="q"></div>
+    <div id="hint"></div>
+    <div id="fb"></div>
+  </div>
+  <div id="ans">
+    <input id="inp" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="60" placeholder="输入答案">
+    <button class="btn ghost" id="skip" style="display:none">跳过</button>
+    <button class="btn" id="ok">确认</button>
+  </div>
+  <div id="choices"></div>
+  <div id="keys"></div>
+  <div id="ov"></div>
+  <div id="toast"></div>
+</div>
+<script>
+// ==PURE-START==
+const ri=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const fmtN=n=>Number(n).toLocaleString('en-US');
+const nm=n=>n<0?'−'+Math.abs(n):String(n);
+const sup=n=>String(n).replace(/\d/g,d=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d]);
+function gcd(a,b){a=Math.abs(a);b=Math.abs(b);while(b){const t=a%b;a=b;b=t}return a}
+function lcm(a,b){return a/gcd(a,b)*b}
+function isPrime(n){if(n<2)return false;for(let i=2;i*i<=n;i++)if(n%i===0)return false;return true}
+function factorize(n){const f=[];for(let p=2;p*p<=n;p++){while(n%p===0){f.push(p);n/=p}}if(n>1)f.push(n);return f}
+function fstr(n){const m={};factorize(n).forEach(p=>m[p]=(m[p]||0)+1);return Object.keys(m).map(p=>m[p]>1?p+sup(m[p]):p).join('×')}
+
+/* ---------- 表达式求值（不用 eval） ---------- */
+function tokenize(s){
+  s=String(s).replace(/[×xX*·＊]/g,'*').replace(/[÷／/]/g,'/').replace(/[−–—－]/g,'-').replace(/（/g,'(').replace(/）/g,')').replace(/＋/g,'+').replace(/\s+/g,'');
+  const t=[];let i=0;
+  while(i<s.length){
+    const c=s[i];
+    if(/[0-9.]/.test(c)){let j=i;while(j<s.length&&/[0-9.]/.test(s[j]))j++;const lit=s.slice(i,j);if(!/^\d+(\.\d+)?$/.test(lit))return {err:'数字格式不对'};t.push({k:'n',v:parseFloat(lit)});i=j}
+    else if('+-*/()'.includes(c)){t.push({k:c});i++}
+    else return {err:'含有不能识别的字符「'+c+'」'};
+  }
+  return {tokens:t};
+}
+function evaluate(src){
+  const tk=tokenize(src);if(tk.err)return {ok:false,err:tk.err};
+  const t=tk.tokens;if(!t.length)return {ok:false,err:'还没输入'};
+  let p=0;const nums=[];
+  const peek=()=>t[p]?t[p].k:null;
+  function expr(){let v=term();while(peek()==='+'||peek()==='-'){const o=t[p++].k;const r=term();v=o==='+'?v+r:v-r}return v}
+  function term(){let v=unary();while(peek()==='*'||peek()==='/'){const o=t[p++].k;const r=unary();if(o==='/'){if(Math.abs(r)<1e-12)throw new Error('除数为 0');v=v/r}else v=v*r}return v}
+  function unary(){if(peek()==='-'){p++;return -unary()}if(peek()==='+'){p++;return unary()}return atom()}
+  function atom(){const k=peek();if(k==='n'){nums.push(t[p].v);return t[p++].v}if(k==='('){p++;const v=expr();if(peek()!==')')throw new Error('括号不匹配');p++;return v}throw new Error('表达式不完整')}
+  try{const v=expr();if(p<t.length)throw new Error('表达式有多余部分（括号不匹配或缺运算符）');if(!isFinite(v))throw new Error('结果无效');return {ok:true,value:v,nums}}
+  catch(e){return {ok:false,err:e.message}}
+}
+function parseNum(s){
+  s=String(s).replace(/[,，\s]/g,'').replace(/[−–—－]/g,'-');
+  if(!/^-?(\d+\.?\d*|\.\d+)$/.test(s))return null;
+  return parseFloat(s);
+}
+function check24(expr,set){
+  const r=evaluate(expr);if(!r.ok)return {status:'invalid',msg:r.err};
+  const a=r.nums.slice().sort((x,y)=>x-y),b=set.slice().sort((x,y)=>x-y);
+  if(a.length!==b.length||a.some((v,i)=>v!==b[i]))return {status:'invalid',msg:'必须恰好各用一次 '+set.join('、')+'（你用了 '+(r.nums.join('、')||'无')+'）'};
+  if(Math.abs(r.value-24)>1e-6)return {status:'invalid',msg:'结果是 '+(Math.round(r.value*1e4)/1e4)+'，不是 24'};
+  return {status:'ok'};
+}
+function checkNum(q,input){
+  const v=parseNum(input);if(v===null)return {status:'invalid',msg:'请输入一个数字'};
+  const ok=q.tol?Math.abs(v-q.ans)<=Math.abs(q.ans)*q.tol+1e-9:Math.abs(v-q.ans)<1e-6;
+  return {status:ok?'ok':'bad'};
+}
+
+/* ---------- 24 点求解 ---------- */
+function combos(a,b){
+  const W=(x,need)=>x.p<need?'('+x.e+')':x.e,out=[];
+  out.push({v:a.v+b.v,e:a.e+'+'+b.e,p:1});
+  out.push({v:a.v*b.v,e:W(a,2)+'×'+W(b,2),p:2});
+  out.push({v:a.v-b.v,e:a.e+'−'+W(b,2),p:1});
+  out.push({v:b.v-a.v,e:b.e+'−'+W(a,2),p:1});
+  if(Math.abs(b.v)>1e-9)out.push({v:a.v/b.v,e:W(a,2)+'÷'+W(b,3),p:2});
+  if(Math.abs(a.v)>1e-9)out.push({v:b.v/a.v,e:W(b,2)+'÷'+W(a,3),p:2});
+  return out;
+}
+function solveAll(nums,cb){
+  function rec(list){
+    if(list.length===1){return Math.abs(list[0].v-24)<1e-6?cb(list[0].e):false}
+    for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++){
+      const rest=list.filter((_,k)=>k!==i&&k!==j);
+      for(const c of combos(list[i],list[j]))if(rec(rest.concat([c])))return true;
+    }
+    return false;
+  }
+  rec(nums.map(n=>({v:n,e:String(n),p:3})));
+}
+function solve24(nums){let r=null;solveAll(nums,e=>{r=e;return true});return r}
+function count24(nums){let c=0;solveAll(nums,()=>{c++;return false});return c}
+
+/* ---------- 统计数据 ---------- */
+const FB_STATS={deleted:3200000,remain:17450000,rate:196000,availKb:33554432,startTotal:20650000};
+function normalizeStats(j){
+  if(!j||typeof j!=='object')return Object.assign({offline:true},FB_STATS);
+  const g=v=>(typeof v==='number'&&isFinite(v)&&v>0)?v:null;
+  const o={deleted:g(j.deleted),remain:g(j.remain),rate:g(j.rate_1m),availKb:g(j.avail_kb),startTotal:g(j.start_total)};
+  let good=0;for(const k in o){if(o[k]==null)o[k]=FB_STATS[k];else good++}
+  if(o.remain<1e5||o.rate<100)return Object.assign({offline:true},FB_STATS);
+  if(o.startTotal<o.deleted+o.remain*0.5)o.startTotal=o.deleted+o.remain;
+  o.offline=good<3;return o;
+}
+
+/* ---------- 题目生成 ---------- */
+function mulEx(a,b){
+  if(b<10)return a+'×'+b+' = '+fmtN(a*b);
+  const t=Math.floor(b/10)*10,u=b%10;
+  return u?`${a}×${b} = ${a}×${t} + ${a}×${u} = ${fmtN(a*t)} + ${fmtN(a*u)} = ${fmtN(a*b)}`:`${a}×${b} = ${fmtN(a*b)}`;
+}
+function genChain(tier){
+  const K=[['mul1','add3'],['mul2a','add3','div','sq1'],['mul2','div','add3','sq1'],['mul32','sq2','div2','mixmul'],['mul32','sq2','dsq','div2','mixmul'],['mul32b','sq2','dsq','mixmul','div2']][tier-1];
+  const k=pick(K);let expr,ans,ex;
+  switch(k){
+    case 'mul1':{const a=ri(12,49),b=ri(3,9);expr=`${a} × ${b}`;ans=a*b;ex=mulEx(a,b);break}
+    case 'add3':{const a=tier===1?ri(120,480):ri(300,899),b=tier===1?ri(120,480):ri(200,799),c=ri(100,Math.min(a+b-1,900));expr=`${fmtN(a)} + ${fmtN(b)} − ${fmtN(c)}`;ans=a+b-c;ex=`${a}+${b}=${a+b}，再减 ${c} = ${ans}`;break}
+    case 'mul2a':{const a=ri(13,49),b=ri(11,29);expr=`${a} × ${b}`;ans=a*b;ex=mulEx(a,b);break}
+    case 'mul2':{const a=ri(23,99),b=ri(23,99);expr=`${a} × ${b}`;ans=a*b;ex=mulEx(a,b);break}
+    case 'mul32':{const a=ri(101,999),b=ri(12,49);expr=`${a} × ${b}`;ans=a*b;ex=mulEx(a,b);break}
+    case 'mul32b':{const a=ri(101,999),b=ri(23,99);expr=`${a} × ${b}`;ans=a*b;ex=mulEx(a,b);break}
+    case 'div':{const b=pick([12,15,16,18,24,25]),q=ri(20,90),a=b*q;expr=`${fmtN(a)} ÷ ${b}`;ans=q;ex=`${q}×${b} = ${fmtN(a)}，所以商是 ${q}`;break}
+    case 'div2':{const b=ri(13,49),q=ri(25,99),a=b*q;expr=`${fmtN(a)} ÷ ${b}`;ans=q;ex=`${q}×${b} = ${fmtN(a)}，所以商是 ${q}`;break}
+    case 'sq1':{const n=ri(11,35);expr=`${n}²`;ans=n*n;ex=`${n}×${n} = ${mulEx(n,n).split('= ').pop()}`;break}
+    case 'sq2':{let n;do{n=ri(31,99)}while(n%10===0);const t=Math.floor(n/10)*10,u=n%10;expr=`${n}²`;ans=n*n;ex=`(${t}+${u})² = ${t*t}+${2*t*u}+${u*u} = ${fmtN(ans)}`;break}
+    case 'dsq':{const a=ri(15,60),b=ri(11,a-1);expr=`${a}² − ${b}²`;ans=a*a-b*b;ex=`平方差：(${a}+${b})×(${a}−${b}) = ${a+b}×${a-b} = ${fmtN(ans)}`;break}
+    case 'mixmul':{const a=ri(12,29),b=ri(12,29),c=ri(11,25),d=ri(11,25),pl=Math.random()<.5;expr=`${a} × ${b} ${pl?'+':'−'} ${c} × ${d}`;ans=pl?a*b+c*d:a*b-c*d;ex=`${a*b} ${pl?'+':'−'} ${c*d} = ${fmtN(ans)}`;break}
+  }
+  return {type:0,label:'心算链',mode:'num',html:expr+' = ?',time:Math.min(25,15+(tier-1)*2),ans,tol:0,ansText:fmtN(ans),explain:ex,hint:'纯心算，直接输入结果'};
+}
+function gen24(tier){
+  let set,tries=0;
+  for(;;){
+    set=[ri(1,13),ri(1,13),ri(1,13),ri(1,13)];
+    const sol=solve24(set);if(!sol)continue;
+    tries++;const c=count24(set);
+    if(tier<=2&&c<14&&tries<80)continue;
+    if(tier>=4&&c>12&&tries<200)continue;
+    if(tier>=6&&c>6&&tries<300)continue;
+    return {type:1,label:'24 点',mode:'expr',set,sol,html:set.map((n,i)=>`<span class="chip c${i%4}">${n}</span>`).join(''),time:60,ans:24,ansText:sol,explain:'参考解：'+sol+' = 24',hint:'用 + − × ÷ ( ) 凑出 24，4 个数各用一次'};
+  }
+}
+function genEst(tier,S){
+  S=S||normalizeStats(null);
+  let remW=Math.round(S.remain/1e4),rateW=Math.round(S.rate/1e3)/10,delW=Math.round(S.deleted/1e4),totW=Math.round(S.startTotal/1e4);
+  if(remW<1||rateW<0.1){remW=1745;rateW=19.6}
+  if(delW<10)delW=ri(50,400);
+  if(totW<=delW)totW=delW+remW;
+  const kinds=['eta','pct','png','avail'];
+  if(tier<=3)kinds.push('hour');
+  if(tier>=3)kinds.push('eta_h');
+  if(tier>=5)kinds.push('need');
+  const k=pick(kinds);let html,ans,ex,unit;
+  const r1=x=>Math.round(x*10)/10;
+  switch(k){
+    case 'eta':ans=remW/rateW;unit='分钟';html=`还剩 <b>${fmtN(remW)} 万</b> 个文件，每分钟删 <b>${rateW} 万</b>，还要几分钟？`;ex=`${remW} ÷ ${rateW} ≈ ${r1(ans)} 分钟`;break;
+    case 'eta_h':ans=remW/rateW/60;unit='小时';html=`还剩 <b>${fmtN(remW)} 万</b> 个文件，每分钟删 <b>${rateW} 万</b>，还要约几小时？`;ex=`${remW} ÷ ${rateW} ÷ 60 ≈ ${Math.round(ans*100)/100} 小时`;break;
+    case 'pct':ans=delW/totW*100;unit='%';html=`已删 <b>${fmtN(delW)} 万</b> 个，原有共 <b>${fmtN(totW)} 万</b> 个，已删占百分之几？`;ex=`${delW} ÷ ${totW} ≈ ${r1(ans)}%`;break;
+    case 'png':{const sz=pick([2.5,3.2,4.5,6.8,12,18]);ans=delW*sz/100;unit='GB';html=`删掉的 PNG 共 <b>${fmtN(delW)} 万</b> 个，每个约 <b>${sz} KB</b>，一共多少 GB？<br><small>（1 GB ≈ 100 万 KB）</small>`;ex=`${delW} 万 × ${sz} KB = ${r1(delW*sz)} 万 KB ≈ ${Math.round(ans*100)/100} GB`;break}
+    case 'avail':{let X=Math.round(S.availKb/1048576);if(X<6)X=ri(30,60);const base=Math.max(1,Math.min(X-1,Math.round(X*(0.55+Math.random()*0.33))));ans=(X-base)/base*100;unit='%';html=`可用空间从 <b>${base} GB</b> 涨到 <b>${X} GB</b>，涨了百分之几？`;ex=`(${X}−${base}) ÷ ${base} ≈ ${r1(ans)}%`;break}
+    case 'hour':ans=rateW*60;unit='万';html=`每分钟删 <b>${rateW} 万</b> 个，一小时能删多少万个？`;ex=`${rateW} × 60 = ${r1(ans)} 万`;break;
+    case 'need':ans=remW/120;unit='万';html=`还剩 <b>${fmtN(remW)} 万</b> 个，想 2 小时删完，每分钟至少要删多少万个？`;ex=`${remW} ÷ 120 ≈ ${Math.round(ans*100)/100} 万/分钟`;break;
+  }
+  return {type:2,label:'百分比与估算',mode:'num',small:true,offline:!!S.offline,html,time:35,ans,tol:0.05,ansText:'≈ '+(Math.round(ans*10)/10),explain:ex,hint:'估算题，±5% 内算对（答案单位：'+unit+'）'};
+}
+const PRIMES=[2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97];
+function genSeq(tier){
+  const kinds=['arith','geo','fib','sq','prime','alt'];
+  if(tier>=3)kinds.push('diff2','diff2');
+  if(tier>=4)kinds.push('inter','inter');
+  if(tier>=5)kinds.push('cube','diffgeo','tri');
+  const k=pick(kinds),s=[];let rule='';
+  switch(k){
+    case 'arith':{const d=Math.random()<.75?ri(3,17):-ri(3,9),a=d>0?ri(2,40):ri(60,99);for(let i=0;i<6;i++)s.push(a+d*i);rule=`等差数列，公差 ${nm(d)}`;break}
+    case 'geo':{const a=ri(1,5),r=pick(tier>=3?[2,3,4,-2]:[2,3,4]);for(let i=0;i<6;i++)s.push(a*Math.pow(r,i));rule=`等比数列，公比 ${nm(r)}`;break}
+    case 'fib':{const a=ri(1,6),b=ri(2,9);s.push(a,b);for(let i=2;i<6;i++)s.push(s[i-1]+s[i-2]);rule='每项等于前两项之和';break}
+    case 'sq':{const n=ri(3,15),o=pick([0,0,1,-1,2,-3]);for(let i=0;i<6;i++)s.push((n+i)*(n+i)+o);rule=`平方数 ${n}²、${n+1}²… ${o?(o>0?'再加 ':'再减 ')+Math.abs(o):''}`;break}
+    case 'prime':{const i0=ri(0,PRIMES.length-8);for(let i=0;i<6;i++)s.push(PRIMES[i0+i]);rule='连续质数';break}
+    case 'alt':{const a=ri(1,6),m=ri(2,3),c=ri(2,9),mulFirst=Math.random()<.5;s.push(a);for(let i=0;i<5;i++){const useMul=(i%2===0)===mulFirst;s.push(useMul?s[i]*m:s[i]+c)}rule=`交替运算：${mulFirst?'×'+m+'、+'+c:'+'+c+'、×'+m}`;break}
+    case 'diff2':{const a=ri(1,9),d0=ri(1,5),e=ri(1,tier>=5?4:3);s.push(a);for(let i=0;i<5;i++)s.push(s[i]+d0+i*e);rule=`相邻差依次为 ${d0}、${d0+e}、${d0+2*e}…（每次多 ${e}）`;break}
+    case 'inter':{const a=ri(1,20),d1=pick([ri(2,7),-ri(1,3)]),b=ri(5,40),d2=ri(3,9)*pick([1,1,-1]);for(let i=0;i<6;i++)s.push(i%2===0?a+d1*(i/2):b+d2*((i-1)/2));rule=`奇数项、偶数项各成等差（公差 ${nm(d1)} 与 ${nm(d2)}）`;break}
+    case 'cube':{const n=ri(2,7),o=pick([0,0,1,-1]);for(let i=0;i<6;i++)s.push(Math.pow(n+i,3)+o);rule=`立方数 ${n}³、${n+1}³… ${o?(o>0?'再加 ':'再减 ')+Math.abs(o):''}`;break}
+    case 'diffgeo':{const a=ri(1,9),c=ri(1,3),r=pick([2,3]);s.push(a);for(let i=0;i<5;i++)s.push(s[i]+c*Math.pow(r,i));rule=`相邻差为 ${c}、${c*r}、${c*r*r}…（差成等比，×${r}）`;break}
+    case 'tri':{const n=ri(2,6);for(let i=0;i<6;i++){const m=n+i;s.push(m*(m+1)/2)}rule='三角形数 n(n+1)/2';break}
+  }
+  return {terms:s.slice(0,5),ans:s[5],rule:rule.trim(),kind:k};
+}
+function genSeqQ(tier){
+  const g=genSeq(tier);
+  return {type:3,label:'数列找规律',mode:'num',html:g.terms.map(fmtN).join('，')+'，<b>?</b>',small:false,time:tier>=4?30:25,ans:g.ans,tol:0,ansText:fmtN(g.ans),explain:g.rule+'，下一项是 '+fmtN(g.ans),hint:'填出下一项'};
+}
+function coprimePair(lo,hi){let m,n;do{m=ri(lo,hi);n=ri(lo,hi)}while(m===n||gcd(m,n)!==1);return [m,n]}
+function genPrime(tier){
+  const kinds=['choice','choice','maxpf','gcd','lcm'];
+  if(tier>=4)kinds.push('ndiv','maxpf');
+  const k=pick(kinds);
+  if(k==='choice'){
+    const R=[[50,130],[100,250],[200,600],[500,999],[1000,2500],[2000,6000]][tier-1];
+    let p;do{p=ri(R[0],R[1])}while(!isPrime(p));
+    const dec=[];
+    while(dec.length<3){const n=ri(R[0],R[1]);if(n%2===0||n%3===0||n%5===0||isPrime(n)||dec.includes(n))continue;dec.push(n)}
+    const opts=shuffle([p].concat(dec));
+    return {type:4,label:'质数与因数',mode:'choice',html:'下列哪个是质数？',time:tier>=4?25:20,choices:opts.map(String),ansIdx:opts.indexOf(p),ansText:String(p),explain:dec.map(n=>n+'='+factorize(n).join('×')).join('，')+'，都是合数',hint:'点选或按 1–4'};
+  }
+  if(k==='maxpf'){
+    const maxI=[5,6,8,10,12,14][tier-1],cnt=tier<3?2:3;let f,n;
+    do{f=[];for(let i=0;i<cnt;i++)f.push(PRIMES[ri(1,maxI)]);n=f.reduce((a,b)=>a*b,1)}while(n>15000||n<30);
+    const a=Math.max.apply(null,f);
+    return {type:4,label:'质数与因数',mode:'num',html:`${fmtN(n)} 的最大质因数`,time:tier>=4?25:20,ans:a,tol:0,ansText:String(a),explain:`${fmtN(n)} = ${fstr(n)}，最大质因数 ${a}`,hint:'分解质因数后取最大的'};
+  }
+  if(k==='ndiv'){
+    let n,e;do{e=[ri(1,4),ri(1,3),ri(0,2),ri(0,1)];n=Math.pow(2,e[0])*Math.pow(3,e[1])*Math.pow(5,e[2])*Math.pow(7,e[3])}while(n<100||n>5000);
+    const a=e.reduce((x,y)=>x*(y+1),1);
+    return {type:4,label:'质数与因数',mode:'num',html:`${fmtN(n)} 有多少个正因数？`,time:25,ans:a,tol:0,ansText:String(a),explain:`${fmtN(n)} = ${fstr(n)}，指数各加 1 相乘 = ${a}`,hint:'提示：先分解质因数'};
+  }
+  const gl=[[2,9,2,9],[4,12,3,12],[8,24,4,15],[12,40,5,22],[15,45,6,28],[20,60,8,35]][tier-1];
+  let g=ri(gl[0],gl[1]);let mn=coprimePair(gl[2],gl[3]);
+  if(k==='lcm'){g=ri(2,Math.min(9,gl[1]));mn=coprimePair(Math.min(gl[2],12),Math.min(gl[3]+3,18))}
+  const a=g*mn[0],b=g*mn[1];
+  if(k==='gcd')return {type:4,label:'质数与因数',mode:'num',html:`gcd(${a}, ${b}) = ?`,time:tier>=4?25:20,ans:g,tol:0,ansText:String(g),explain:`${a} = ${fstr(a)}，${b} = ${fstr(b)}，最大公约数 ${g}`,hint:'最大公约数'};
+  const L=lcm(a,b);
+  return {type:4,label:'质数与因数',mode:'num',html:`lcm(${a}, ${b}) = ?`,time:tier>=4?25:20,ans:L,tol:0,ansText:fmtN(L),explain:`${a}×${b} ÷ gcd(${g}) = ${fmtN(L)}`,hint:'最小公倍数'};
+}
+function ts(c,v,first){if(c===0)return '';const a=Math.abs(c),body=(a===1&&v?'':a)+v;return first?(c<0?'−':'')+body:` ${c<0?'−':'+'} ${body}`}
+function lin(a,b){return ts(a,'x',true)+(b===0?'':ts(b,'',false))}
+function quadStr(b,c){return 'x²'+(b?ts(b,'x',false):'')+(c?ts(c,'',false):'')+' = 0'}
+function genEq(tier){
+  const K=[['lin1'],['lin1','lin2','frac'],['lin2','frac','sys1'],['sys1','sys2','quad','frac'],['sys2','quad','quadneg','sys2'],['quadneg','quadsum','sys2','quad']][tier-1];
+  const k=pick(K);let html,ans,ex,time=20,hint='求解并输入数值';
+  switch(k){
+    case 'lin1':{const x=ri(2,tier===1?15:30),a=ri(2,9),b=ri(3,40)*pick([1,-1]),c=a*x+b;html=`${lin(a,b)} = ${nm(c)}，x = ?`;ans=x;ex=`${a}x = ${nm(c)}${b>=0?' − ':' + '}${Math.abs(b)} = ${c-b}，x = ${x}`;break}
+    case 'lin2':{const x=ri(2,20)*(tier>=5?pick([1,-1]):1),a=ri(4,12),c=ri(1,a-2),b=ri(1,30),d=(a-c)*x+b;html=`${lin(a,b)} = ${lin(c,d)}，x = ?`;ans=x;ex=`移项：${a-c}x = ${d-b}，x = ${x}`;time=25;break}
+    case 'frac':{const d1=pick([2,3,4,5]),d2=pick([3,4,5,6,8]);if(d1===d2)return genEq(tier);const L=lcm(d1,d2),kk=ri(1,9),x=L*kk,mi=d1<d2&&Math.random()<.5,rhs=mi?x/d1-x/d2:x/d1+x/d2;html=`x/${d1} ${mi?'−':'+'} x/${d2} = ${rhs}，x = ?`;ans=x;ex=`通分：x×(${L/d1}${mi?'−':'+'}${L/d2})/${L} = ${rhs}，x = ${x}`;time=25;break}
+    case 'sys1':{const x=ri(10,40),y=ri(2,x-1),askY=Math.random()<.4;html=`x + y = ${x+y}，x − y = ${x-y}，求 ${askY?'y':'x'}`;ans=askY?y:x;ex=`相加得 2x = ${2*x}，x = ${x}；代回得 y = ${y}`;time=25;break}
+    case 'sys2':{let a1,b1,a2,b2,x,y;const pool=tier>=6?[-4,-3,-2,-1,1,2,3,4,5]:[1,2,3,4];
+      do{a1=pick(pool);b1=pick(pool);a2=pick(pool);b2=pick(pool)}while(a1*b2-a2*b1===0);
+      x=ri(2,12);y=ri(2,12);const c1=a1*x+b1*y,c2=a2*x+b2*y,w=pick(['x','y','x+y']);
+      html=`${ts(a1,'x',true)}${ts(b1,'y',false)} = ${nm(c1)}<br>${ts(a2,'x',true)}${ts(b2,'y',false)} = ${nm(c2)}<br>求 ${w==='x+y'?'x + y':w}`;
+      ans=w==='x'?x:w==='y'?y:x+y;ex=`解得 x = ${x}，y = ${y}${w==='x+y'?'，x+y = '+(x+y):''}`;time=40;break}
+    case 'quad':{const r1=ri(2,12),r2=ri(1,r1-1);html=`${quadStr(-(r1+r2),r1*r2)}<br><small>的较大根 x = ?</small>`;ans=r1;ex=`(x−${r1})(x−${r2}) = 0，较大根 ${r1}`;time=35;break}
+    case 'quadneg':{let r1,r2;do{r1=ri(-9,12);r2=ri(-12,9)}while(r1===r2||r1===0||r2===0);const hi=Math.max(r1,r2),lo=Math.min(r1,r2);html=`${quadStr(-(r1+r2),r1*r2)}<br><small>的较大根 x = ?</small>`;ans=hi;ex=`(x${lo<0?'+':'−'}${Math.abs(lo)})(x${hi<0?'+':'−'}${Math.abs(hi)}) = 0，较大根 ${nm(hi)}`;time=40;break}
+    case 'quadsum':{const r1=ri(3,15),r2=ri(2,r1-1);html=`${quadStr(-(r1+r2),r1*r2)}<br><small>两根的平方和 = ?</small>`;ans=r1*r1+r2*r2;ex=`两根和 ${r1+r2}、积 ${r1*r2}：${(r1+r2)**2} − 2×${r1*r2} = ${ans}`;hint='提示：韦达定理，不必解根';time=40;break}
+  }
+  return {type:5,label:'方程速解',mode:'num',small:k.startsWith('sys')||k.startsWith('quad'),html,time,ans,tol:0,ansText:nm(ans),explain:ex,hint};
+}
+const TYPE_W={1:[3,1,1,2,2,2],2:[3,2,2,2,2,2],3:[3,2,2,2,2,3],4:[2,3,3,3,3,3],5:[2,3,3,3,3,3],6:[2,3,3,3,3,3]};
+const GENS=[genChain,gen24,genEst,genSeqQ,genPrime,genEq];
+function pickQuestion(tier,last,S){
+  const w=TYPE_W[tier].slice();if(last>=0)w[last]=0;
+  let r=Math.random()*w.reduce((a,b)=>a+b,0),i=0;
+  for(;i<w.length;i++){r-=w[i];if(r<0)break}
+  if(i>=w.length)i=0;
+  return GENS[i](tier,S);
+}
+// ==PURE-END==
+
+/* ================= UI ================= */
+const $=id=>document.getElementById(id);
+let mode='quest',lastFail=null,duelBest=0,tq=[],tBusy=false,pend=[];
+let st='start',lives=3,score=0,combo=0,maxCombo=0,correct=0,tier=1,q=null,lastType=-1,tEnd=0,tTotal=1,lastSec=-1,fbTimer=null,pendingToast=0,hidAt=0;
+let S=normalizeStats(null),lastGood=null,best=0,muted=false,AC=null;
+const coarse=window.matchMedia&&matchMedia('(pointer:coarse)').matches;
+try{duelBest=+localStorage.getItem('cleanup_math_duel_best')||0;best=+localStorage.getItem('cleanup_math_best')||0;muted=localStorage.getItem('cleanup_math_mute')==='1'}catch(e){}
+
+/* sound */
+function unlock(){if(!AC){try{AC=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(AC&&AC.state==='suspended')AC.resume()}
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,unlock,{passive:true}));
+function tone(f,d,type,v,delay){if(muted||!AC)return;try{const t=AC.currentTime+(delay||0),o=AC.createOscillator(),g=AC.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(v||.12,t+.01);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(AC.destination);o.start(t);o.stop(t+d+.03)}catch(e){}}
+const sOk=()=>{tone(660,.12);tone(990,.22,'sine',.12,.1)};
+const sBad=()=>{tone(130,.32,'sawtooth',.09);tone(95,.3,'sawtooth',.09,.12)};
+const sTick=()=>tone(1300,.05,'square',.04);
+const sTier=()=>[523,659,784,1047].forEach((f,i)=>tone(f,.15,'triangle',.1,i*.08));
+function setMute(m){muted=m;$('mute').textContent=m?'🔇':'🔊';try{localStorage.setItem('cleanup_math_mute',m?'1':'0')}catch(e){}}
+$('mute').onclick=()=>{unlock();setMute(!muted);if(!coarse&&st==='ask')$('inp').focus()};
+setMute(muted);
+
+/* stats */
+async function fetchStats(){
+  try{const c=new AbortController(),to=setTimeout(()=>c.abort(),4000);const r=await fetch('/stats',{cache:'no-store',signal:c.signal});clearTimeout(to);if(!r.ok)throw 0;
+    const j=await r.json();const n=normalizeStats(j);if(n.offline)throw 0;S=n;lastGood=n}
+  catch(e){S=lastGood?Object.assign({},lastGood,{offline:true}):normalizeStats(null)}
+}
+fetchStats();setInterval(fetchStats,10000);
+
+/* keypad */
+const KEYS=['7','8','9','+','−','(',')','4','5','6','×','÷','.','⌫','1','2','3','0','✓'];
+(function(){const k=$('keys');KEYS.forEach(c=>{const b=document.createElement('button');b.className='key'+('+−×÷()'.includes(c)?' op':'')+(c==='✓'?' go':'');b.textContent=c;b.dataset.k=c;
+  b.addEventListener('mousedown',e=>e.preventDefault());b.addEventListener('click',()=>keyPress(c));k.appendChild(b)})})();
+function keyPress(c){
+  if(st!=='ask'||q.mode==='choice')return;
+  if(c==='✓'){submit();return}
+  const inp=$('inp');let s=inp.selectionStart,e=inp.selectionEnd;if(s==null){s=e=inp.value.length}
+  if(c==='⌫'){if(s!==e)inp.setRangeText('',s,e,'end');else if(s>0)inp.setRangeText('',s-1,s,'end')}
+  else inp.setRangeText(c,s,e,'end');
+  setHint(q.hint,false);if(!coarse)inp.focus();
+}
+
+/* header */
+function renderTop(){
+  $('tier').textContent='Lv.'+tier;
+  if(mode==='duel'){
+    $('lives').innerHTML=`<span style="font-size:12px;font-weight:700">⚔️ 已击败 ${correct} 位挑战者</span>`;
+    $('score').textContent='守擂 '+correct;$('combo').style.display='none';
+  }else{
+    $('lives').innerHTML=[0,1,2].map(i=>`<span class="${i<lives?'':'x'}">🦖</span>`).join('');
+    $('score').textContent=score;$('combo').style.display='';
+    const m=Math.min(5,Math.max(1,combo));$('combo').textContent='×'+m;$('combo').className='pill'+(combo>=2?' hot':'');
+  }
+}
+function toast(t){tq.push(t);runToast()}
+function runToast(){if(tBusy||!tq.length)return;tBusy=true;const e=$('toast');e.textContent=tq.shift();e.classList.add('on');setTimeout(()=>{e.classList.remove('on');setTimeout(()=>{tBusy=false;runToast()},250)},1000)}
+function setHint(t,err){const h=$('hint');h.textContent=t||'';h.className=err?'err':''}
+
+/* overlay */
+function showStart(){
+  st='start';
+  $('ov').innerHTML=`<div class="card"><h2>🦖 数学闯关</h2><p>选一个模式：<br>🧮 闯关：3 条命，每答对 5 题升一级，连对最高 ×5<br>⚔️ 一站到底：0 容错，错一题或超时立刻下台，每题仅 10 秒</p><div style="display:flex;flex-direction:column;gap:8px;align-items:center"><button class="btn" id="go1" style="height:44px;width:80%;font-size:17px">🧮 闯关模式</button><button class="btn" id="go2" style="height:44px;width:80%;font-size:17px;background:var(--orange);color:#fff">⚔️ 一站到底</button></div><div class="stats"><span><b>${best}</b>闯关最高分</span><span><b>${duelBest}</b>最高守擂</span></div></div>`;
+  $('ov').classList.add('on');$('go1').onclick=()=>startGame('quest');$('go2').onclick=()=>startGame('duel');setTimeout(()=>$('go1').focus(),30);
+}
+function gameOver(){
+  st='over';stopTimer();let html;
+  if(mode==='duel'){
+    const rec=correct>duelBest&&correct>0;if(rec){duelBest=correct;try{localStorage.setItem('cleanup_math_duel_best',String(duelBest))}catch(e){}}
+    const f=lastFail||{label:'',ans:'',ex:''};
+    html=`<div class="card"><h2>你已下台</h2><div class="big">守擂 ${correct} 题</div><p style="margin:2px 0">${rec?'🎉 新守擂纪录！':'最佳守擂 '+duelBest+' 题'}　·　你已击败 ${correct} 位挑战者</p><p style="margin:6px 0;color:var(--ink);font-size:13px">终结你的题型：<b>${f.label}</b><br>正确答案：${f.ans}<br><span style="color:var(--mute)">${f.ex}</span></p><div style="display:flex;gap:8px;justify-content:center"><button class="btn" id="go" style="height:42px;padding:0 26px;font-size:16px">再战一次</button><button class="btn ghost" id="back" style="height:42px">换模式</button></div></div>`;
+  }else{
+    const rec=score>best&&score>0;if(rec){best=score;try{localStorage.setItem('cleanup_math_best',String(best))}catch(e){}}
+    html=`<div class="card"><h2>闯关结束</h2><div class="big">${score}</div><p style="margin:2px 0">${rec?'🎉 新纪录！':'最高分 '+best}</p><div class="stats"><span><b>${maxCombo}</b>最高连击</span><span><b>${correct}</b>答对题数</span><span><b>Lv.${tier}</b>到达难度</span></div><div style="display:flex;gap:8px;justify-content:center"><button class="btn" id="go" style="height:42px;padding:0 26px;font-size:16px">再来一局</button><button class="btn ghost" id="back" style="height:42px">换模式</button></div></div>`;
+  }
+  $('ov').innerHTML=html;$('ov').classList.add('on');
+  $('go').onclick=()=>startGame(mode);$('back').onclick=()=>{renderTop();showStart()};setTimeout(()=>$('go').focus(),30);
+}
+
+/* game flow */
+function startGame(m){
+  unlock();if(m==='quest'||m==='duel')mode=m;lives=mode==='duel'?1:3;score=0;combo=0;maxCombo=0;correct=0;tier=1;lastType=-1;pend=[];tq=[];lastFail=null;
+  $('ov').classList.remove('on');renderTop();nextQ();
+}
+function nextQ(){
+  clearTimeout(fbTimer);
+  q=pickQuestion(tier,lastType,S);lastType=q.type;if(mode==='duel')q.time=q.type===1?30:10;
+  $('main').classList.remove('main-fb');$('fb').innerHTML='';
+  const tag=q.type===2?(q.offline?'<span class="tag off">离线</span>':'<span class="tag">实时数据</span>'):'';
+  $('qtype').innerHTML=`<span>${q.label}</span>${tag}`;
+  const qe=$('q');qe.innerHTML=q.html;qe.className=q.small?'sm':'';
+  setHint(q.hint,false);
+  const ch=q.mode==='choice';
+  $('ans').style.display=ch?'none':'flex';$('keys').style.display=ch?'none':'grid';$('choices').style.display=ch?'grid':'none';
+  $('skip').style.display=q.mode==='expr'?'block':'none';
+  const inp=$('inp');inp.value='';inp.readOnly=false;
+  inp.placeholder=q.mode==='expr'?'例：(10×10−4)÷4':'输入答案';
+  inp.inputMode=coarse?'none':(q.mode==='expr'?'text':'decimal');
+  document.querySelectorAll('.key.op').forEach(b=>b.classList.toggle('off',q.mode!=='expr'));
+  if(ch){$('choices').innerHTML=q.choices.map((c,i)=>`<button class="ch" data-i="${i}">${fmtN(c)}</button>`).join('');
+    $('choices').querySelectorAll('.ch').forEach(b=>b.onclick=()=>submit(+b.dataset.i))}
+  st='ask';tTotal=q.time;tEnd=performance.now()+q.time*1000;lastSec=-1;startTimer();
+  if(!coarse&&!ch)inp.focus();
+  if(pend.length){pend.forEach(toast);pend=[];sTier()}
+  renderTop();
+}
+let timer=null;
+function startTimer(){stopTimer();timer=setInterval(tick,100);tick()}
+function stopTimer(){if(timer){clearInterval(timer);timer=null}}
+function tick(){
+  if(st!=='ask')return;
+  const rem=(tEnd-performance.now())/1000,f=$('barfill');
+  f.style.width=Math.max(0,rem/tTotal*100)+'%';
+  f.className=rem<=5?'low':(rem/tTotal<.5?'mid':'');
+  if(rem<=5&&rem>0){const s=Math.ceil(rem);if(s!==lastSec){lastSec=s;sTick()}}
+  if(rem<=0)finish(false,'⏰ 时间到');
+}
+function submit(ci){
+  if(st!=='ask')return;let r;
+  if(q.mode==='choice')r={status:ci===q.ansIdx?'ok':'bad'};
+  else{const v=$('inp').value.trim();if(!v){$('inp').focus();return}r=q.mode==='expr'?check24(v,q.set):checkNum(q,v)}
+  if(r.status==='invalid'){setHint(r.msg,true);const m=$('main');m.classList.remove('shake');void m.offsetWidth;m.classList.add('shake');return}
+  finish(r.status==='ok','✗ 答错了');
+}
+function finish(ok,why){
+  if(st!=='ask')return;
+  st='fb';const rem=Math.max(0,(tEnd-performance.now())/1000);
+  $('inp').readOnly=true;$('main').classList.add('main-fb');
+  const fb=$('fb');let delay;
+  if(ok){
+    combo++;maxCombo=Math.max(maxCombo,combo);correct++;
+    const duel=mode==='duel';
+    if(duel){score=correct;sOk();fb.innerHTML=`<div class="t ok">✓ 守擂 ${correct} 题</div>`;delay=500;
+      const ms={5:'守擂 5 题，擂台开始热了',10:'守擂 10 题，全场安静了',20:'守擂 20 题，擂主传说诞生'}[correct];if(ms)pend.push('【叮！】'+ms)}
+    else{const mult=Math.min(5,combo),base=(10+5*tier)*(q.mode==='expr'?3:1),bonus=Math.round(base*.5*rem/tTotal),pts=(base+bonus)*mult;
+      score+=pts;sOk();fb.innerHTML=`<div class="t ok">✓ 正确 +${pts}${mult>1?'（连击 ×'+mult+'）':''}</div>`;delay=750}
+    const nt=Math.min(6,1+Math.floor(correct/(duel?3:5)));if(nt>tier){tier=nt;pend.push('系统提示：难度提升到 Lv.'+tier)}
+  }else{
+    combo=0;sBad();
+    const sk=why==='跳过';
+    if(mode==='duel'){lives=0;lastFail={label:q.label+(sk?'（跳过）':why==='⏰ 时间到'?'（超时）':''),ans:q.ansText,ex:q.explain};
+      fb.innerHTML=`<div class="t no">${sk?'跳过 = 下台':why==='⏰ 时间到'?'⏰ 超时，下台':'✗ 答错，下台'}　正确答案：${q.ansText}</div><div class="e">${q.explain}</div><div class="go">点击或按 Enter 继续</div>`;delay=2200}
+    else{lives--;
+      fb.innerHTML=`<div class="t no">${sk?'已跳过（-1 条命）':why}　正确答案：${q.ansText}</div><div class="e">${q.explain}</div><div class="go">点击或按 Enter 继续</div>`;
+      delay=q.mode==='expr'?5000:3400}
+  }
+  renderTop();
+  fbTimer=setTimeout(advance,delay);
+}
+function advance(){
+  if(st!=='fb')return;clearTimeout(fbTimer);
+  if(lives<=0)gameOver();else nextQ();
+}
+$('main').addEventListener('click',()=>{if(st==='fb')advance()});
+$('ok').onclick=()=>submit();
+$('skip').onclick=()=>{if(st==='ask')finish(false,'跳过')};
+$('inp').addEventListener('keydown',e=>{if(e.key==='Enter'&&st==='ask'){submit()}});
+document.addEventListener('keydown',e=>{
+  if(st==='fb'&&(e.key==='Enter'||e.key===' ')&&e.target.tagName!=='BUTTON'){advance();return}
+  if((st==='start'||st==='over')&&e.key==='Enter'&&e.target.tagName!=='BUTTON'){startGame();return}
+  if(st==='ask'&&q&&q.mode==='choice'&&/^[1-4]$/.test(e.key)){submit(+e.key-1)}
+});
+document.addEventListener('visibilitychange',()=>{if(document.hidden)hidAt=performance.now();else if(hidAt){if(st==='ask')tEnd+=performance.now()-hidAt;hidAt=0}});
+window.addEventListener('focus',()=>{if(st==='ask'&&!coarse&&q&&q.mode!=='choice')$('inp').focus()});
+renderTop();showStart();
+</script>
+</body>
+</html>
